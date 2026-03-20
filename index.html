@@ -253,6 +253,18 @@
       </div>
     </div>
 
+    <!-- Filtro Tipo de Negócio -->
+    <div class="filter-group">
+      <div class="filter-label">Tipo de Negócio</div>
+      <div class="filter-dropdown" id="filtroTipo">
+        <div class="filter-dropdown-btn" onclick="toggleDropdown('filtroTipo')">
+          <span class="filter-dropdown-label">Todos os tipos</span>
+          <span>▾</span>
+        </div>
+        <div class="filter-dropdown-list"></div>
+      </div>
+    </div>
+
     <!-- Filtro Data — select normal (mês e ano) -->
     <div class="filter-group">
       <div class="filter-label">Mês / Ano de Vigência</div>
@@ -385,6 +397,7 @@ function processFile(file) {
         COL_COMISSAO : findCol('COMISSÃO','COMISSAO','COMIS'),
         COL_SEG      : findCol('SEGURADORA','SEGURAD'),
         COL_PRODUTOR : findCol('COLABORADOR'),
+        COL_TIPO     : findCol('TIPO DE NEGÓCIO','TIPO DE NEGOCIO','TIPO NEGOCIO','TIPO'),
         COL_VIGENCIA : findCol('VIGÊNCIA','VIGENCIA','INÍCIO','INICIO'),
       };
 
@@ -412,9 +425,22 @@ function showError(msg) {
 }
 
 // ════════════════════════════════════════
+//  NORMALIZA TIPO DE NEGÓCIO
+//  Converte N, R, RO ou textos por extenso
+//  para os 3 valores canônicos do sistema
+// ════════════════════════════════════════
+function normalizarTipo(val) {
+  const v = (val+'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (v === 'N' || v.includes('NOVO'))                          return 'Seguro Novo';
+  if (v === 'R' || v.includes('PROPRIA') || v.includes('PROPRIA CORRETORA') || (v.includes('RENOVACAO') && !v.includes('OUTRA'))) return 'Renovação da Própria Corretora';
+  if (v === 'RO' || v.includes('OUTRA'))                        return 'Renovação de Outra Corretora';
+  return null; // valor desconhecido: ignora
+}
+
+// ════════════════════════════════════════
 //  2. POPULAR OS DROPDOWNS COM CHECKBOXES
 // ════════════════════════════════════════
-function popularFiltros(rows, {COL_RAMO, COL_PRODUTOR, COL_SEG, COL_VIGENCIA}) {
+function popularFiltros(rows, {COL_RAMO, COL_PRODUTOR, COL_SEG, COL_VIGENCIA, COL_TIPO}) {
 
   // Cria um checkbox para cada valor único dentro do dropdown
   function preencherDropdown(id, valores) {
@@ -430,6 +456,12 @@ function popularFiltros(rows, {COL_RAMO, COL_PRODUTOR, COL_SEG, COL_VIGENCIA}) {
   preencherDropdown('filtroRamo',       [...new Set(rows.map(r=>(r[COL_RAMO]+'').trim()).filter(Boolean))]);
   preencherDropdown('filtroProdutor',   COL_PRODUTOR ? [...new Set(rows.map(r=>(r[COL_PRODUTOR]+'').trim()).filter(Boolean))] : []);
   preencherDropdown('filtroSeguradora', COL_SEG      ? [...new Set(rows.map(r=>(r[COL_SEG]+'').trim()).filter(Boolean))]      : []);
+
+  // Tipo de negócio: normaliza N/R/RO para exibição amigável e usa valores canônicos
+  if (COL_TIPO) {
+    const tiposUnicos = [...new Set(rows.map(r => normalizarTipo(r[COL_TIPO])).filter(Boolean))];
+    preencherDropdown('filtroTipo', tiposUnicos);
+  }
 
   // Anos: popula o select normal
   if (COL_VIGENCIA) {
@@ -492,7 +524,8 @@ function atualizarLabels() {
   const textos = {
     filtroRamo:       'Todos os ramos',
     filtroProdutor:   'Todos os produtores',
-    filtroSeguradora: 'Todas as seguradoras'
+    filtroSeguradora: 'Todas as seguradoras',
+    filtroTipo:       'Todos os tipos'
   };
   Object.keys(textos).forEach(id => {
     const selecionados = lerCheckboxes(id);
@@ -513,6 +546,7 @@ function aplicarFiltros() {
   const fRamo     = lerCheckboxes('filtroRamo');
   const fProdutor = lerCheckboxes('filtroProdutor');
   const fSeg      = lerCheckboxes('filtroSeguradora');
+  const fTipo     = lerCheckboxes('filtroTipo');
   const fMes      = document.getElementById('filtroMes').value;
   const fAno      = document.getElementById('filtroAno').value;
   const {rows, cols} = globalData;
@@ -523,6 +557,7 @@ function aplicarFiltros() {
     if (fRamo.length     > 0 && !fRamo.includes((r[cols.COL_RAMO]+'').trim()))                              return false;
     if (fProdutor.length > 0 && cols.COL_PRODUTOR && !fProdutor.includes((r[cols.COL_PRODUTOR]+'').trim())) return false;
     if (fSeg.length      > 0 && cols.COL_SEG      && !fSeg.includes((r[cols.COL_SEG]+'').trim()))           return false;
+    if (fTipo.length     > 0 && cols.COL_TIPO     && !fTipo.includes(normalizarTipo(r[cols.COL_TIPO])))      return false;
 
     if ((fMes !== 'todos' || fAno !== 'todos') && cols.COL_VIGENCIA) {
       const d = new Date(r[cols.COL_VIGENCIA]);
@@ -535,7 +570,7 @@ function aplicarFiltros() {
   });
 
   // Badge mostrando resultado do filtro
-  const ativos = fRamo.length + fProdutor.length + fSeg.length + (fMes!=='todos'?1:0) + (fAno!=='todos'?1:0);
+  const ativos = fRamo.length + fProdutor.length + fSeg.length + fTipo.length + (fMes!=='todos'?1:0) + (fAno!=='todos'?1:0);
   const badge  = document.getElementById('filterBadge');
   if (ativos > 0) {
     badge.style.display = 'block';
