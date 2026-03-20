@@ -21,7 +21,7 @@
     background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);
     background-size:48px 48px; pointer-events:none; z-index:0;
   }
- 
+
   /* UPLOAD */
   #uploadScreen { position:fixed; inset:0; z-index:100; background:var(--bg); display:flex; align-items:center; justify-content:center; }
   #uploadScreen::before { content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px); background-size:48px 48px; pointer-events:none; }
@@ -40,11 +40,11 @@
   .cols-hint strong { color:var(--text-dim); }
   .col-tag { display:inline-block; padding:1px 7px; border:1px solid var(--border); color:var(--accent); margin:2px; font-size:0.62rem; }
   .upload-error { width:420px; padding:12px 16px; background:rgba(255,107,53,0.08); border:1px solid var(--accent3); color:var(--accent3); font-size:0.68rem; display:none; white-space:pre-wrap; }
- 
+
   /* DASHBOARD */
   #dashboard { display:none; position:relative; z-index:1; }
   .wrapper { max-width:1400px; margin:0 auto; padding:40px 32px 60px; }
- 
+
   header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:36px; padding-bottom:28px; border-bottom:1px solid var(--border); }
   .header-left h1 { font-size:2.2rem; font-weight:800; letter-spacing:-0.03em; line-height:1.1; }
   .header-left h1 span { color:var(--accent); }
@@ -54,12 +54,12 @@
   .update-btn { padding:8px 18px; background:transparent; border:1px solid var(--border); color:var(--text-dim); font-family:'Poppins',sans-serif; font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; transition:border-color 0.2s,color 0.2s; }
   .update-btn:hover { border-color:var(--accent); color:var(--accent); }
   .date-tag { font-size:0.68rem; color:var(--text-muted); }
- 
+
   /* FILTROS */
   .filters-bar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); padding:18px 20px; margin-bottom:32px; overflow:visible; position:relative; z-index:100; }
   .filter-group { display:flex; flex-direction:column; gap:6px; flex:1; min-width:160px; }
   .filter-label { font-size:0.6rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); }
- 
+
   /* Dropdown com checkboxes */
   .filter-dropdown { position:relative; } .filter-dropdown.open { z-index:9999; }
   .filter-dropdown-btn {
@@ -83,7 +83,7 @@
   }
   .filter-dropdown-list label:hover { background:rgba(0,229,255,0.06); color:var(--text); }
   .filter-dropdown-list input[type="checkbox"] { accent-color:var(--accent); width:13px; height:13px; flex-shrink:0; }
- 
+
   /* Select de data (mês/ano mantém select normal) */
   .filter-select {
     padding:9px 30px 9px 12px; background:var(--bg); border:1px solid var(--border);
@@ -100,11 +100,11 @@
   .filter-reset { padding:9px 18px; background:transparent; border:1px solid var(--border); color:var(--text-muted); font-family:'Poppins',sans-serif; font-size:0.65rem; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; transition:border-color 0.2s,color 0.2s; white-space:nowrap; }
   .filter-reset:hover { border-color:var(--accent3); color:var(--accent3); }
   .filter-badge { display:none; padding:9px 14px; background:rgba(0,229,255,0.08); border:1px solid var(--accent); color:var(--accent); font-size:0.65rem; white-space:nowrap; text-align:center; }
- 
+
   /* SECTION LABEL */
   .section-label { font-size:0.65rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent); margin-bottom:16px; display:flex; align-items:center; gap:10px; }
   .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
- 
+
   /* KPIs */
   .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:40px; }
   .kpi-card { background:var(--surface); border:1px solid var(--border); padding:24px 22px; position:relative; overflow:hidden; transition:border-color 0.3s,transform 0.3s; }
@@ -119,7 +119,7 @@
   .kpi-card:nth-child(3) .kpi-value { color:var(--accent3); }
   .kpi-card:nth-child(4) .kpi-value { color:var(--accent2); }
   .kpi-sub { margin-top:8px; font-size:0.63rem; color:var(--text-dim); }
- 
+
   /* CHARTS */
   .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
   .chart-card { background:var(--surface); border:1px solid var(--border); padding:28px; animation:fadeUp 0.6s ease both; }
@@ -132,7 +132,7 @@
   .legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
   .legend-label { color:var(--text-dim); flex:1; }
   .legend-val { color:var(--text); }
- 
+
   /* CROSS-SELL */
   .cross-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:40px; }
   .cross-card { background:var(--surface); border:1px solid var(--border); padding:20px; animation:fadeUp 0.7s ease both; transition:border-color 0.3s; }
@@ -142,7 +142,7 @@
   .progress-wrap { height:5px; background:var(--border); margin-bottom:10px; overflow:hidden; }
   .progress-bar { height:100%; width:0; transition:width 1.2s cubic-bezier(0.16,1,0.3,1); }
   .cross-stats { display:flex; justify-content:space-between; font-size:0.63rem; color:var(--text-muted); }
- 
+
   /* CLIENT SEARCH */
   .search-section { margin-bottom:40px; }
   .search-row { display:flex; gap:12px; margin-bottom:16px; }
@@ -165,14 +165,14 @@
   .opp-tag { display:inline-block; padding:4px 10px; border:1px solid var(--border); font-size:0.65rem; color:var(--text-dim); margin:3px; }
   .no-client { padding:20px; font-size:0.75rem; color:var(--accent3); background:var(--surface); border:1px solid var(--border); }
   .footer { text-align:center; margin-top:48px; padding-top:24px; border-top:1px solid var(--border); font-size:0.63rem; color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase; }
- 
+
   @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
   @media(max-width:1024px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.chart-card.wide{grid-column:span 1}.cross-grid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:600px){.wrapper{padding:20px 14px}.kpi-grid{grid-template-columns:1fr 1fr}.cross-grid{grid-template-columns:1fr}header{flex-direction:column;gap:12px}.donut-wrap{flex-direction:column}.filters-bar{flex-direction:column}}
 </style>
 </head>
 <body>
- 
+
 <!-- UPLOAD -->
 <div id="uploadScreen">
   <div class="upload-inner">
@@ -197,11 +197,11 @@
     <div class="upload-error" id="uploadError"></div>
   </div>
 </div>
- 
+
 <!-- DASHBOARD -->
 <div id="dashboard">
 <div class="wrapper">
- 
+
   <header>
     <div class="header-left">
       <h1>Dashboard de<br><span>Produção</span></h1>
@@ -213,10 +213,10 @@
       <span class="date-tag" id="dateTag"></span>
     </div>
   </header>
- 
+
   <!-- FILTROS -->
   <div class="filters-bar">
- 
+
     <!-- Filtro Ramo — dropdown com checkboxes -->
     <div class="filter-group">
       <div class="filter-label">Ramo</div>
@@ -228,7 +228,7 @@
         <div class="filter-dropdown-list"></div>
       </div>
     </div>
- 
+
     <!-- Filtro Produtor — dropdown com checkboxes -->
     <div class="filter-group">
       <div class="filter-label">Produtor</div>
@@ -240,7 +240,7 @@
         <div class="filter-dropdown-list"></div>
       </div>
     </div>
- 
+
     <!-- Filtro Seguradora — dropdown com checkboxes -->
     <div class="filter-group">
       <div class="filter-label">Seguradora</div>
@@ -252,7 +252,7 @@
         <div class="filter-dropdown-list"></div>
       </div>
     </div>
- 
+
     <!-- Filtro Data — select normal (mês e ano) -->
     <div class="filter-group">
       <div class="filter-label">Mês / Ano de Vigência</div>
@@ -271,14 +271,14 @@
         </select>
       </div>
     </div>
- 
+
     <div class="filter-actions">
       <button class="filter-reset" onclick="resetFiltros()">✕ Limpar filtros</button>
       <div class="filter-badge" id="filterBadge"></div>
     </div>
- 
+
   </div>
- 
+
   <!-- KPIs -->
   <div class="section-label">Visão Geral da Carteira</div>
   <div class="kpi-grid">
@@ -287,7 +287,7 @@
     <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value" id="kpiTicket">—</div><div class="kpi-sub" id="kpiTicketSub"></div></div>
     <div class="kpi-card"><div class="kpi-label">Total de Clientes</div><div class="kpi-value" id="kpiClientes">—</div><div class="kpi-sub" id="kpiClientesSub"></div></div>
   </div>
- 
+
   <!-- Charts -->
   <div class="charts-grid">
     <div class="chart-card">
@@ -309,11 +309,11 @@
       <div style="height:260px"><canvas id="ticketRamoChart"></canvas></div>
     </div>
   </div>
- 
+
   <!-- Cross-sell -->
   <div class="section-label">Penetração por Ramo — Oportunidades de Cross-sell</div>
   <div class="cross-grid" id="crossGrid"></div>
- 
+
   <!-- Produção por Vendedor -->
   <div class="section-label">Produção Individual por Vendedor</div>
   <div class="chart-card" id="vendedorSection" style="margin-bottom:20px">
@@ -326,7 +326,7 @@
       <div id="vendedorLegenda" style="width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto"></div>
     </div>
   </div>
- 
+
   <!-- Busca de cliente -->
   <div class="section-label">Consulta de Cliente</div>
   <div class="search-section">
@@ -336,11 +336,11 @@
     </div>
     <div id="clientResult"></div>
   </div>
- 
+
   <div class="footer" id="footerTxt"></div>
 </div>
 </div>
- 
+
 <script>
 // ════════════════════════════════════════
 //  ESTADO GLOBAL
@@ -348,12 +348,12 @@
 let charts     = {};
 let globalData = null;
 let filename   = '';
- 
+
 const COLORS = ['#00e5ff','#7b5ea7','#ff6b35','#00c896','#ffd166','#ef476f','#118ab2','#06d6a0','#f78c6b','#a8dadc','#c77dff','#ffb347'];
 const fmt    = v => 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtM   = v => v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1)+'M' : 'R$ '+(v/1e3).toFixed(0)+'k';
 const norm   = s => s?.toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') || '';
- 
+
 // ════════════════════════════════════════
 //  DRAG & DROP
 // ════════════════════════════════════════
@@ -362,7 +362,7 @@ dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('ove
 dz.addEventListener('dragleave', () => dz.classList.remove('over'));
 dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); const f=e.dataTransfer.files[0]; if(f) processFile(f); });
 document.getElementById('fileInput').addEventListener('change', e => { if(e.target.files[0]) processFile(e.target.files[0]); });
- 
+
 // ════════════════════════════════════════
 //  1. LER A PLANILHA
 // ════════════════════════════════════════
@@ -374,10 +374,10 @@ function processFile(file) {
       const wb   = XLSX.read(e.target.result, {type:'array', cellDates:true});
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
       if (!rows.length) { showError('Planilha vazia.'); return; }
- 
+
       const keys    = Object.keys(rows[0]);
       const findCol = (...opts) => keys.find(k => opts.some(o => norm(k).includes(norm(o)))) || null;
- 
+
       const cols = {
         COL_CLIENTE  : findCol('CLIENTE'),
         COL_RAMO     : findCol('RAMO'),
@@ -387,35 +387,35 @@ function processFile(file) {
         COL_PRODUTOR : findCol('COLABORADOR'),
         COL_VIGENCIA : findCol('VIGÊNCIA','VIGENCIA','INÍCIO','INICIO'),
       };
- 
+
       if (!cols.COL_CLIENTE || !cols.COL_RAMO || !cols.COL_PREMIO) {
         showError(`Colunas obrigatórias não encontradas (CLIENTE, RAMO, PRÊMIO).\nDetectadas: ${keys.join(', ')}`);
         return;
       }
- 
+
       globalData = { rows, cols };
       popularFiltros(rows, cols);
       renderizarDashboard(rows, cols);
- 
+
       document.getElementById('uploadScreen').style.display = 'none';
       document.getElementById('dashboard').style.display    = 'block';
       document.getElementById('dateTag').textContent = 'Atualizado: ' + new Date().toLocaleDateString('pt-BR');
- 
+
     } catch(err) { showError('Erro ao ler: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 }
- 
+
 function showError(msg) {
   const el = document.getElementById('uploadError');
   el.textContent = msg; el.style.display = 'block';
 }
- 
+
 // ════════════════════════════════════════
 //  2. POPULAR OS DROPDOWNS COM CHECKBOXES
 // ════════════════════════════════════════
 function popularFiltros(rows, {COL_RAMO, COL_PRODUTOR, COL_SEG, COL_VIGENCIA}) {
- 
+
   // Cria um checkbox para cada valor único dentro do dropdown
   function preencherDropdown(id, valores) {
     const lista = document.querySelector(`#${id} .filter-dropdown-list`);
@@ -426,11 +426,11 @@ function popularFiltros(rows, {COL_RAMO, COL_PRODUTOR, COL_SEG, COL_VIGENCIA}) {
         ${v}
       </label>`).join('');
   }
- 
+
   preencherDropdown('filtroRamo',       [...new Set(rows.map(r=>(r[COL_RAMO]+'').trim()).filter(Boolean))]);
   preencherDropdown('filtroProdutor',   COL_PRODUTOR ? [...new Set(rows.map(r=>(r[COL_PRODUTOR]+'').trim()).filter(Boolean))] : []);
   preencherDropdown('filtroSeguradora', COL_SEG      ? [...new Set(rows.map(r=>(r[COL_SEG]+'').trim()).filter(Boolean))]      : []);
- 
+
   // Anos: popula o select normal
   if (COL_VIGENCIA) {
     const anos = [...new Set(rows.map(r => {
@@ -444,39 +444,39 @@ function popularFiltros(rows, {COL_RAMO, COL_PRODUTOR, COL_SEG, COL_VIGENCIA}) {
       opt.value = a; opt.textContent = a; selAno.appendChild(opt);
     });
   }
- 
+
   document.getElementById('filtroMes').addEventListener('change', aplicarFiltros);
   document.getElementById('filtroAno').addEventListener('change', aplicarFiltros);
 }
- 
+
 // ════════════════════════════════════════
 //  HELPERS DOS DROPDOWNS
 // ════════════════════════════════════════
- 
+
 // Retorna array com os valores dos checkboxes marcados
 function lerCheckboxes(id) {
   return [...document.querySelectorAll(`#${id} input:checked`)].map(cb => cb.value);
 }
- 
+
 // Abre/fecha o dropdown ao clicar no botão
 function toggleDropdown(id) {
   const el    = document.getElementById(id);
   const lista = el.querySelector('.filter-dropdown-list');
   const aberto = el.classList.contains('open');
- 
+
   // Fecha todos os outros primeiro
   document.querySelectorAll('.filter-dropdown.open').forEach(d => {
     d.classList.remove('open');
     d.querySelector('.filter-dropdown-list').style.display = 'none';
   });
- 
+
   // Se estava fechado, abre
   if (!aberto) {
     el.classList.add('open');
     lista.style.display = 'block';
   }
 }
- 
+
 // Fecha qualquer dropdown aberto ao clicar fora
 document.addEventListener('click', e => {
   if (!e.target.closest('.filter-dropdown')) {
@@ -486,7 +486,7 @@ document.addEventListener('click', e => {
     });
   }
 });
- 
+
 // Atualiza o texto do botão: "Todos os ramos" ou "3 selecionado(s)"
 function atualizarLabels() {
   const textos = {
@@ -500,15 +500,15 @@ function atualizarLabels() {
     if (label) label.textContent = selecionados.length === 0 ? textos[id] : `${selecionados.length} selecionado(s)`;
   });
 }
- 
+
 // ════════════════════════════════════════
 //  3. APLICAR FILTROS
 // ════════════════════════════════════════
 function aplicarFiltros() {
   if (!globalData) return;
- 
+
   atualizarLabels(); // atualiza texto dos botões
- 
+
   // Lê os checkboxes marcados (retorna array vazio se nenhum marcado = sem filtro)
   const fRamo     = lerCheckboxes('filtroRamo');
   const fProdutor = lerCheckboxes('filtroProdutor');
@@ -516,24 +516,24 @@ function aplicarFiltros() {
   const fMes      = document.getElementById('filtroMes').value;
   const fAno      = document.getElementById('filtroAno').value;
   const {rows, cols} = globalData;
- 
+
   // Filtra linha a linha
   const dfFiltrado = rows.filter(r => {
     // Se o array está vazio, nenhum filtro está ativo para esse campo
     if (fRamo.length     > 0 && !fRamo.includes((r[cols.COL_RAMO]+'').trim()))                              return false;
     if (fProdutor.length > 0 && cols.COL_PRODUTOR && !fProdutor.includes((r[cols.COL_PRODUTOR]+'').trim())) return false;
     if (fSeg.length      > 0 && cols.COL_SEG      && !fSeg.includes((r[cols.COL_SEG]+'').trim()))           return false;
- 
+
     if ((fMes !== 'todos' || fAno !== 'todos') && cols.COL_VIGENCIA) {
       const d = new Date(r[cols.COL_VIGENCIA]);
       if (isNaN(d)) return false;
       if (fMes !== 'todos' && d.getMonth() + 1 !== parseInt(fMes)) return false;
       if (fAno !== 'todos' && d.getFullYear()   !== parseInt(fAno)) return false;
     }
- 
+
     return true;
   });
- 
+
   // Badge mostrando resultado do filtro
   const ativos = fRamo.length + fProdutor.length + fSeg.length + (fMes!=='todos'?1:0) + (fAno!=='todos'?1:0);
   const badge  = document.getElementById('filterBadge');
@@ -543,10 +543,10 @@ function aplicarFiltros() {
   } else {
     badge.style.display = 'none';
   }
- 
+
   renderizarDashboard(dfFiltrado, cols);
 }
- 
+
 function resetFiltros() {
   // Desmarca todos os checkboxes
   document.querySelectorAll('.filter-dropdown-list input[type="checkbox"]').forEach(cb => cb.checked = false);
@@ -556,23 +556,23 @@ function resetFiltros() {
   document.getElementById('filterBadge').style.display = 'none';
   if (globalData) renderizarDashboard(globalData.rows, globalData.cols);
 }
- 
+
 // ════════════════════════════════════════
 //  4. RENDERIZAR O DASHBOARD
 // ════════════════════════════════════════
 function renderizarDashboard(df, cols) {
   const {COL_CLIENTE, COL_RAMO, COL_PREMIO, COL_COMISSAO} = cols;
- 
+
   const clientRamos = {}, ramoPremio = {}, ramoCount = {};
   let totalPremio = 0, totalComissao = 0;
- 
+
   df.forEach(r => {
     const cli  = (r[COL_CLIENTE]+'').trim();
     const ramo = (r[COL_RAMO]+'').trim();
     const prem = parseFloat(r[COL_PREMIO]) || 0;
     const com  = parseFloat(COL_COMISSAO ? r[COL_COMISSAO] : 0) || 0;
     if (!cli || !ramo) return;
- 
+
     if (!clientRamos[cli]) clientRamos[cli] = new Set();
     clientRamos[cli].add(ramo);
     ramoPremio[ramo] = (ramoPremio[ramo] || 0) + prem;
@@ -580,22 +580,22 @@ function renderizarDashboard(df, cols) {
     totalPremio   += prem;
     totalComissao += com;
   });
- 
+
   const totalClients = Object.keys(clientRamos).length;
   const r1 = Object.values(clientRamos).filter(s => s.size === 1).length;
   const r2 = Object.values(clientRamos).filter(s => s.size === 2).length;
   const r3 = Object.values(clientRamos).filter(s => s.size >= 3).length;
   const ticketMedio = totalClients ? totalPremio / totalClients : 0;
- 
+
   const ticketRamo = {};
   Object.keys(ramoPremio).forEach(r => { ticketRamo[r] = ramoPremio[r] / ramoCount[r]; });
- 
+
   const penetracao = {};
   Object.keys(ramoCount).forEach(ramo => {
     const tem = Object.values(clientRamos).filter(s => s.has(ramo)).length;
     penetracao[ramo] = { pct: tem / totalClients * 100, qtd: tem, ticket: ticketRamo[ramo] };
   });
- 
+
   // KPIs
   document.getElementById('kpiPremio').textContent    = fmtM(totalPremio);
   document.getElementById('kpiPremioSub').textContent = fmt(totalPremio);
@@ -607,20 +607,20 @@ function renderizarDashboard(df, cols) {
   document.getElementById('kpiClientes').textContent    = totalClients.toLocaleString('pt-BR');
   document.getElementById('kpiClientesSub').textContent = `${df.length.toLocaleString('pt-BR')} apólices`;
   document.getElementById('footerTxt').textContent = `Fonte: ${filename} · ${df.length.toLocaleString('pt-BR')} apólices · Corretora de Seguros · ${new Date().getFullYear()}`;
- 
+
   renderCharts(r1, r2, r3, ramoPremio, ticketRamo);
   renderCrossSell(penetracao, totalClients);
   renderVendedores(df, cols, totalPremio);
 }
- 
+
 // ════════════════════════════════════════
 //  GRÁFICOS
 // ════════════════════════════════════════
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
- 
+
 function renderCharts(r1, r2, r3, ramoPremio, ticketRamo) {
   const total = r1 + r2 + r3;
- 
+
   destroyChart('donut');
   const dC = ['#00e5ff','#7b5ea7','#ff6b35'], dL = ['Apenas 1 ramo','2 ramos','3+ ramos'], dV = [r1,r2,r3];
   document.getElementById('donutLegend').innerHTML =
@@ -638,7 +638,7 @@ function renderCharts(r1, r2, r3, ramoPremio, ticketRamo) {
     data:{labels:dL, datasets:[{data:dV, backgroundColor:dC, borderWidth:0, hoverOffset:6}]},
     options:{cutout:'72%', plugins:{legend:{display:false}, tooltip:tip(ctx=>` ${ctx.label}: ${ctx.raw.toLocaleString('pt-BR')} clientes`)}, animation:{duration:800}}
   });
- 
+
   destroyChart('premioRamo');
   const prem = Object.entries(ramoPremio).sort((a,b)=>b[1]-a[1]).slice(0,8);
   charts['premioRamo'] = new Chart(document.getElementById('premioRamoChart'), {
@@ -646,7 +646,7 @@ function renderCharts(r1, r2, r3, ramoPremio, ticketRamo) {
     data:{labels:prem.map(([k])=>k.length>18?k.slice(0,17)+'…':k), datasets:[{data:prem.map(([,v])=>+(v/1e6).toFixed(3)), backgroundColor:COLORS.slice(0,8).map(c=>c+'cc'), borderColor:COLORS.slice(0,8), borderWidth:1, borderRadius:2}]},
     options:{indexAxis:'y', plugins:{legend:{display:false}, tooltip:tip(ctx=>` R$ ${ctx.raw.toFixed(2)}M`)}, scales:{x:sX(v=>`R$${v}M`), y:sY()}, animation:{duration:800}}
   });
- 
+
   destroyChart('ticketRamo');
   const tk = Object.entries(ticketRamo).filter(([k,v])=>v>0&&k!=='OUTROS RAMOS').sort((a,b)=>b[1]-a[1]);
   charts['ticketRamo'] = new Chart(document.getElementById('ticketRamoChart'), {
@@ -655,7 +655,7 @@ function renderCharts(r1, r2, r3, ramoPremio, ticketRamo) {
     options:{plugins:{legend:{display:false}, tooltip:tip(ctx=>` ${fmt(ctx.raw)}`)}, scales:{x:sX(null,35), y:sY(v=>`R$${(v/1000).toFixed(0)}k`)}, animation:{duration:800}}
   });
 }
- 
+
 function tip(labelFn) {
   return {backgroundColor:'#0e1420', borderColor:'#1e2a3a', borderWidth:1, titleFont:{family:'Poppins',size:11}, bodyFont:{family:'Poppins',size:11}, callbacks:{label:labelFn}};
 }
@@ -665,7 +665,7 @@ function sX(cb, maxRot=0) {
 function sY(cb) {
   return {grid:{display:false}, border:{color:'#1e2a3a'}, ticks:{color:'#8a9ab0', font:{family:'Poppins',size:9}, ...(cb?{callback:cb}:{})}};
 }
- 
+
 // ════════════════════════════════════════
 //  CROSS-SELL CARDS
 // ════════════════════════════════════════
@@ -694,7 +694,7 @@ function renderCrossSell(penetracao, totalClients) {
     document.querySelectorAll('.progress-bar').forEach(b => { b.style.width = b.dataset.w + '%'; });
   }, 300);
 }
- 
+
 // ════════════════════════════════════════
 //  PRODUÇÃO POR VENDEDOR
 // ════════════════════════════════════════
@@ -704,7 +704,7 @@ function renderVendedores(df, cols, totalPremio) {
     return;
   }
   document.getElementById('vendedorSection').style.display = 'block';
- 
+
   // Agrega prêmio e contagem de apólices por vendedor
   const porVendedor = {};
   df.forEach(r => {
@@ -715,18 +715,18 @@ function renderVendedores(df, cols, totalPremio) {
     porVendedor[v].premio   += prem;
     porVendedor[v].apolices += 1;
   });
- 
+
   // Ordena do maior para o menor
   const sorted = Object.entries(porVendedor).sort((a,b) => b[1].premio - a[1].premio);
- 
+
   // Ajusta altura do gráfico dinamicamente (mínimo 300px)
   const altura = Math.max(300, sorted.length * 38);
   document.getElementById('vendedorChartWrap').style.height = altura + 'px';
- 
+
   const labels = sorted.map(([nome]) => nome.length > 28 ? nome.slice(0,27)+'…' : nome);
   const valores = sorted.map(([,d]) => d.premio);
   const total   = totalPremio || valores.reduce((s,v)=>s+v,0);
- 
+
   // Cores degradê de ciano para roxo
   const barColors = sorted.map((_,i) => {
     const t = sorted.length > 1 ? i / (sorted.length - 1) : 0;
@@ -735,7 +735,7 @@ function renderVendedores(df, cols, totalPremio) {
     const b = Math.round(255 + t * (167 - 255));
     return `rgba(${r},${g},${b},0.82)`;
   });
- 
+
   destroyChart('vendedor');
   charts['vendedor'] = new Chart(document.getElementById('vendedorChart'), {
     type: 'bar',
@@ -767,7 +767,7 @@ function renderVendedores(df, cols, totalPremio) {
       animation: { duration: 900 }
     }
   });
- 
+
   // Legenda lateral com valor e %
   const legenda = document.getElementById('vendedorLegenda');
   legenda.innerHTML = sorted.map(([nome, d], i) => {
@@ -781,30 +781,30 @@ function renderVendedores(df, cols, totalPremio) {
     </div>`;
   }).join('');
 }
- 
+
 // ════════════════════════════════════════
 //  BUSCA DE CLIENTE
 // ════════════════════════════════════════
 document.getElementById('clientSearch').addEventListener('keydown', e => { if(e.key==='Enter') searchClient(); });
- 
+
 function searchClient() {
   const query  = norm(document.getElementById('clientSearch').value);
   const result = document.getElementById('clientResult');
   if (!query || !globalData) { result.style.display='none'; return; }
- 
+
   const {rows, cols} = globalData;
   const {COL_CLIENTE, COL_RAMO, COL_PREMIO, COL_COMISSAO, COL_SEG, COL_VIGENCIA} = cols;
   const matches = rows.filter(r => norm(r[COL_CLIENTE]+'').includes(query));
- 
+
   if (!matches.length) {
     result.style.display='block';
     result.innerHTML=`<div class="no-client">Nenhum cliente encontrado.</div>`;
     return;
   }
- 
+
   const byClient = {};
   matches.forEach(r => { const n=(r[COL_CLIENTE]+'').trim(); if(!byClient[n]) byClient[n]=[]; byClient[n].push(r); });
- 
+
   let html = '';
   Object.entries(byClient).forEach(([nome, apolices]) => {
     const totalP  = apolices.reduce((s,r)=>s+(parseFloat(r[COL_PREMIO])||0),0);
@@ -835,11 +835,11 @@ function searchClient() {
       </div>`:''}
       <div style="height:24px"></div>`;
   });
- 
+
   result.style.display='block';
   result.innerHTML=html;
 }
- 
+
 // ════════════════════════════════════════
 //  RESET COMPLETO
 // ════════════════════════════════════════
