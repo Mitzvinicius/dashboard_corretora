@@ -8,11 +8,15 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh;font-size:13px}
 
-/* ── Dark mode ────────────────────────────────────────────────────────────── */
+/* ── Dark mode ── */
 @media(prefers-color-scheme:dark){
   body{background:#0d1117;color:#e6edf3}
-  .filters,.chart-card,.kpi{background:#161b22;border-color:#30363d}
+  .filters,.chart-card,.kpi,.section-card{background:#161b22;border-color:#30363d}
   header{background:#161b22 !important;border-color:#30363d !important}
+  .nav-tabs{background:#161b22;border-color:#30363d}
+  .tab-btn{color:#7d8590}
+  .tab-btn:hover{color:#c9d1d9;background:#1e2530}
+  .tab-btn.active{color:#e6edf3;border-bottom-color:#388bfd}
   header h1{color:#e6edf3}
   header p,#rec-badge{color:#7d8590}
   input[type=date]{background:#1e2530;border-color:#30363d;color:#e6edf3}
@@ -28,7 +32,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   .kpi-label,.kpi-sub{color:#7d8590}
   .kpi-value{color:#e6edf3}
   .chart-badge{background:#1e2530;color:#7d8590}
-  .chart-title{color:#e6edf3}
+  .chart-title,.section-title{color:#e6edf3}
   .legend{color:#7d8590}
   .f-label,.date-sep{color:#7d8590}
   .metric-toggle label{color:#7d8590;background:#1e2530;border-color:#30363d}
@@ -38,7 +42,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   .var-pos{background:rgba(99,153,34,.25);color:#97C459}
   .var-neg{background:rgba(226,75,74,.22);color:#F09595}
   .var-neu{background:rgba(136,135,128,.18);color:#7d8590}
-  /* multiselect dark */
   .ms-trigger{background:#1e2530;border-color:#30363d;color:#e6edf3}
   .ms-trigger:hover,.ms-trigger.open{border-color:#388bfd}
   .ms-dropdown{background:#161b22;border-color:#30363d;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -48,16 +51,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   .ms-footer{border-color:#30363d;background:#161b22}
   .ms-footer button{color:#7d8590}
   .ms-footer button:hover{color:#e6edf3}
-  /* cancel checkboxes dark */
   .cancel-filter{background:#1e2530;border-color:#30363d}
   .cancel-cb-item label{color:#c9d1d9}
   .cancel-cb-item:hover{background:#161b22}
   .cancel-filter-footer{border-color:#30363d}
   .cancel-filter-footer button{color:#7d8590}
   .cancel-filter-footer button:hover{color:#e6edf3}
+  .section-header{border-color:#30363d}
+  .section-header:hover{background:#1e2530}
+  .collapse-btn{color:#7d8590}
+  .prod-table th{background:#1e2530;color:#7d8590;border-color:#30363d}
+  .prod-table td{border-color:#30363d;color:#c9d1d9}
+  .prod-table tr:hover td{background:#1e2530}
+  .prod-table .num{color:#e6edf3}
+  .sort-btn{color:#7d8590}
+  .sort-btn.active{color:#388bfd}
+  .view-toggle label{color:#7d8590;background:#1e2530;border-color:#30363d}
+  .view-toggle input:checked+label{background:#1a2a3a;border-color:#388bfd;color:#79c0ff}
+  .period-row{border-color:#30363d;background:#0d1117}
+  .period-tag{background:#1e2530;border-color:#30363d;color:#c9d1d9}
+  .bar-fill-bg{background:#1e2530}
 }
 
-/* ── Upload ──────────────────────────────────────────────────────────────── */
+/* ── Upload ── */
 #upload-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
 #upload-zone{border:1.5px dashed #c0bfb8;border-radius:12px;padding:3rem 4rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;max-width:480px;width:100%}
 #upload-zone:hover,#upload-zone.drag{border-color:#666;background:#efefea}
@@ -71,9 +87,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #progress-bar-fill{height:100%;width:0%;background:#378ADD;border-radius:20px;transition:width .1s}
 #progress-text{font-size:12px;color:#666}
 
-/* ── Shell ───────────────────────────────────────────────────────────────── */
+/* ── Shell ── */
 #dash{display:none}
-header{background:#fff;border-bottom:0.5px solid #e0e0db;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:200}
+header{background:#fff;border-bottom:0.5px solid #e0e0db;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:300}
 header h1{font-size:15px;font-weight:500}
 header p{font-size:11px;color:#666;margin-top:2px}
 .topbar-actions{display:flex;gap:8px;align-items:center}
@@ -81,8 +97,14 @@ header p{font-size:11px;color:#666;margin-top:2px}
 .btn-sm:hover{background:#e0e0db}
 #rec-badge{font-size:11px;color:#666;font-family:monospace}
 
-/* ── Filters bar ─────────────────────────────────────────────────────────── */
-.filters{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;background:#fff;border-bottom:0.5px solid #e0e0db;align-items:flex-end;position:sticky;top:57px;z-index:150}
+/* ── Nav tabs ── */
+.nav-tabs{display:flex;gap:0;background:#fff;border-bottom:0.5px solid #e0e0db;padding:0 20px;position:sticky;top:57px;z-index:250}
+.tab-btn{padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-size:12px;font-weight:500;color:#666;font-family:inherit;transition:all .15s;white-space:nowrap}
+.tab-btn:hover{color:#1a1a1a;background:#f5f5f0}
+.tab-btn.active{color:#1a1a1a;border-bottom-color:#378ADD}
+
+/* ── Filters bar ── */
+.filters{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;background:#fff;border-bottom:0.5px solid #e0e0db;align-items:flex-end;position:sticky;top:101px;z-index:200}
 .f-group{display:flex;flex-direction:column;gap:3px}
 .f-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#666;font-weight:500}
 input[type=date]{background:#f5f5f0;border:0.5px solid #c0bfb8;border-radius:8px;color:#1a1a1a;padding:5px 8px;font-size:12px;font-family:inherit;outline:none;cursor:pointer}
@@ -94,7 +116,7 @@ input[type=date]:focus{border-color:#378ADD}
 .tipo-btn:hover{border-color:#888;color:#1a1a1a}
 .tipo-btn.active{background:#e8f0fb;border-color:#378ADD;color:#185FA5}
 
-/* ── Multi-select dropdown ───────────────────────────────────────────────── */
+/* ── Multi-select ── */
 .ms-wrap{position:relative;min-width:148px}
 .ms-trigger{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;background:#f5f5f0;border:0.5px solid #c0bfb8;border-radius:8px;cursor:pointer;font-size:12px;color:#1a1a1a;user-select:none;transition:border-color .15s;min-height:29px}
 .ms-trigger:hover,.ms-trigger.open{border-color:#378ADD}
@@ -103,7 +125,7 @@ input[type=date]:focus{border-color:#378ADD}
 .ms-arrow{font-size:9px;color:#999;flex-shrink:0;transition:transform .15s}
 .ms-trigger.open .ms-arrow{transform:rotate(180deg)}
 .ms-badge{background:#378ADD;color:#fff;border-radius:10px;font-size:10px;font-weight:600;padding:1px 6px;flex-shrink:0;line-height:16px}
-.ms-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:100%;max-width:320px;background:#fff;border:0.5px solid #c0bfb8;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:500;overflow:hidden}
+.ms-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:100%;max-width:320px;background:#fff;border:0.5px solid #c0bfb8;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:600;overflow:hidden}
 .ms-dropdown.open{display:block}
 .ms-search{width:100%;padding:8px 10px;border:none;border-bottom:0.5px solid #e0e0db;font-size:12px;font-family:inherit;outline:none;background:#fff}
 .ms-list{max-height:220px;overflow-y:auto}
@@ -116,17 +138,24 @@ input[type=date]:focus{border-color:#378ADD}
 .ms-footer button{background:none;border:none;font-size:11px;cursor:pointer;color:#666;font-family:inherit;padding:2px 4px;border-radius:4px;transition:color .15s}
 .ms-footer button:hover{color:#1a1a1a}
 
-/* ── Metric toggle ───────────────────────────────────────────────────────── */
+/* ── Metric toggle ── */
 .metric-toggle{display:flex;gap:3px;align-items:center;flex-shrink:0}
 .metric-toggle input[type=radio]{display:none}
 .metric-toggle label{padding:3px 10px;background:#f5f5f0;border:0.5px solid #c0bfb8;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;color:#666;transition:all .15s;white-space:nowrap}
 .metric-toggle label:hover{border-color:#888;color:#1a1a1a}
 .metric-toggle input:checked+label{background:#e8f0fb;border-color:#378ADD;color:#185FA5;font-weight:600}
 
-/* ── Main ────────────────────────────────────────────────────────────────── */
-.main{padding:16px 20px}
+/* ── View toggle (radio buttons) ── */
+.view-toggle{display:flex;gap:3px}
+.view-toggle input[type=radio]{display:none}
+.view-toggle label{padding:3px 12px;background:#f5f5f0;border:0.5px solid #c0bfb8;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;color:#666;transition:all .15s}
+.view-toggle input:checked+label{background:#e8f0fb;border-color:#378ADD;color:#185FA5;font-weight:600}
 
-/* ── KPIs ────────────────────────────────────────────────────────────────── */
+/* ── Tab panes ── */
+.tab-pane{display:none;padding:16px 20px}
+.tab-pane.active{display:block}
+
+/* ── KPIs ── */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:16px}
 .kpi{background:#fff;border:0.5px solid #e0e0db;border-radius:12px;padding:14px;position:relative;overflow:hidden}
 .kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
@@ -136,7 +165,7 @@ input[type=date]:focus{border-color:#378ADD}
 .kpi-value{font-size:20px;font-weight:500;font-family:monospace;letter-spacing:-1px;line-height:1;color:#1a1a1a}
 .kpi-sub{font-size:11px;color:#666;margin-top:4px}
 
-/* ── Charts ──────────────────────────────────────────────────────────────── */
+/* ── Charts ── */
 .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .chart-card{background:#fff;border:0.5px solid #e0e0db;border-radius:12px;padding:16px}
 .chart-card.span2{grid-column:span 2}
@@ -147,8 +176,6 @@ input[type=date]:focus{border-color:#378ADD}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:#666;margin-bottom:4px}
 .leg-dot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
 .cw{position:relative;width:100%}
-
-/* ── Variation bar ───────────────────────────────────────────────────────── */
 .var-bar{display:flex;margin-top:8px;background:#f0f0eb;border-radius:6px;overflow:hidden;height:22px}
 .var-item{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;font-family:monospace;flex:1;white-space:nowrap;overflow:hidden;cursor:default;transition:opacity .15s}
 .var-item:hover{opacity:.75}
@@ -156,7 +183,7 @@ input[type=date]:focus{border-color:#378ADD}
 .var-neg{background:rgba(226,75,74,.12);color:#a02020}
 .var-neu{background:transparent;color:#888}
 
-/* ── Cancelamentos filter ────────────────────────────────────────────────── */
+/* ── Cancelamentos filter ── */
 .cancel-filter{margin-bottom:12px;background:#f9f9f6;border:0.5px solid #e0e0db;border-radius:8px;overflow:hidden}
 .cancel-filter-header{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;cursor:pointer;user-select:none}
 .cancel-filter-title{font-size:11px;font-weight:500;color:#555;display:flex;align-items:center;gap:6px}
@@ -172,6 +199,53 @@ input[type=date]:focus{border-color:#378ADD}
 .cancel-filter-footer{display:flex;gap:8px;padding:6px 10px;border-top:0.5px solid #e0e0db;background:#f5f5f0}
 .cancel-filter-footer button{background:none;border:none;font-size:11px;cursor:pointer;color:#666;font-family:inherit;padding:2px 4px;border-radius:4px}
 .cancel-filter-footer button:hover{color:#1a1a1a}
+
+/* ── Collapsible section card ── */
+.section-card{background:#fff;border:0.5px solid #e0e0db;border-radius:12px;margin-bottom:14px;overflow:hidden}
+.section-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;user-select:none;border-bottom:0.5px solid transparent;transition:background .15s}
+.section-header:hover{background:#f9f9f6}
+.section-header.open{border-bottom-color:#e0e0db}
+.section-title{font-size:12px;font-weight:500;color:#1a1a1a;display:flex;align-items:center;gap:8px}
+.section-title-badge{font-size:10px;color:#666;background:#f5f5f0;padding:2px 8px;border-radius:20px;font-weight:400}
+.section-controls{display:flex;gap:8px;align-items:center}
+.collapse-btn{background:none;border:none;font-size:16px;cursor:pointer;color:#999;line-height:1;padding:0 4px;transition:transform .2s,color .15s;font-family:inherit}
+.collapse-btn:hover{color:#1a1a1a}
+.section-body{padding:16px}
+.section-body.hidden{display:none}
+
+/* ── Period picker (for line chart) ── */
+.period-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:0.5px solid #e0e0db;background:#fafaf7}
+.period-tag{display:flex;align-items:center;gap:6px;padding:3px 8px;background:#f5f5f0;border:0.5px solid #c0bfb8;border-radius:6px;font-size:11px;color:#1a1a1a}
+.period-tag .pt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.period-tag .pt-label{font-family:monospace}
+.period-tag .pt-remove{cursor:pointer;color:#999;font-size:13px;line-height:1;margin-left:2px}
+.period-tag .pt-remove:hover{color:#E24B4A}
+.period-add{display:flex;gap:4px;align-items:center}
+.period-add input[type=date]{min-width:120px;padding:4px 7px;font-size:11px}
+.period-add .btn-add{padding:4px 10px;font-size:11px}
+.period-legend{display:flex;flex-wrap:wrap;gap:10px;padding:6px 0 10px;font-size:11px;color:#666}
+
+/* ── Prod table ── */
+.prod-table-wrap{overflow-x:auto}
+.prod-table{width:100%;border-collapse:collapse}
+.prod-table th{padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#666;font-weight:600;background:#f9f9f6;border-bottom:0.5px solid #e0e0db;white-space:nowrap;user-select:none;cursor:pointer}
+.prod-table th:hover{color:#1a1a1a}
+.prod-table th .sort-icon{margin-left:4px;opacity:.4;font-size:10px}
+.prod-table th.sort-asc .sort-icon::after{content:'▲';opacity:1}
+.prod-table th.sort-desc .sort-icon::after{content:'▼';opacity:1}
+.prod-table th:not(.sort-asc):not(.sort-desc) .sort-icon::after{content:'⇅'}
+.prod-table td{padding:8px 12px;font-size:12px;border-bottom:0.5px solid #e0e0db;color:#1a1a1a}
+.prod-table tr:last-child td{border-bottom:none}
+.prod-table tr:hover td{background:#f9f9f6;transition:background .1s}
+.prod-table .num{font-family:monospace;text-align:right}
+.prod-table .name-cell{font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prod-table tfoot td{font-weight:600;background:#f5f5f0;border-top:0.5px solid #c0bfb8;font-size:11px}
+.bar-fill-bg{height:4px;background:#f0f0eb;border-radius:2px;margin-top:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width .4s}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:700;background:#f0f0eb;color:#666}
+.rank-badge.r1{background:#f0c040;color:#7a5800}
+.rank-badge.r2{background:#d0d8e0;color:#3a4a58}
+.rank-badge.r3{background:#e0b898;color:#6a3a18}
 
 @media(max-width:700px){
   .charts-grid{grid-template-columns:1fr}
@@ -218,8 +292,14 @@ input[type=date]:focus{border-color:#378ADD}
     </div>
   </header>
 
+  <!-- Nav tabs -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="showTab('visao-geral',this)">Visão geral</button>
+    <button class="tab-btn" onclick="showTab('producao',this)">Produção por colaborador</button>
+  </div>
+
+  <!-- Filters (shared) -->
   <div class="filters">
-    <!-- Datas -->
     <div class="f-group">
       <span class="f-label">Vigência</span>
       <div class="date-pair">
@@ -232,24 +312,10 @@ input[type=date]:focus{border-color:#378ADD}
         <input type="date" id="f-em-s"><span class="date-sep">→</span><input type="date" id="f-em-e">
       </div>
     </div>
-    <!-- Multi-selects -->
-    <div class="f-group">
-      <span class="f-label">Colaborador</span>
-      <div class="ms-wrap" id="ms-col"></div>
-    </div>
-    <div class="f-group">
-      <span class="f-label">Grupo de produção</span>
-      <div class="ms-wrap" id="ms-grp"></div>
-    </div>
-    <div class="f-group">
-      <span class="f-label">Ramo</span>
-      <div class="ms-wrap" id="ms-ram"></div>
-    </div>
-    <div class="f-group">
-      <span class="f-label">Seguradora</span>
-      <div class="ms-wrap" id="ms-seg"></div>
-    </div>
-    <!-- Tipo (pill buttons) -->
+    <div class="f-group"><span class="f-label">Colaborador</span><div class="ms-wrap" id="ms-col"></div></div>
+    <div class="f-group"><span class="f-label">Grupo de produção</span><div class="ms-wrap" id="ms-grp"></div></div>
+    <div class="f-group"><span class="f-label">Ramo</span><div class="ms-wrap" id="ms-ram"></div></div>
+    <div class="f-group"><span class="f-label">Seguradora</span><div class="ms-wrap" id="ms-seg"></div></div>
     <div class="f-group" style="flex:1;min-width:220px">
       <span class="f-label">Tipo de documento</span>
       <div class="tipo-btns" id="tipo-btns"></div>
@@ -259,12 +325,10 @@ input[type=date]:focus{border-color:#378ADD}
     </div>
   </div>
 
-  <div class="main">
+  <!-- ═══ TAB: VISÃO GERAL ═══ -->
+  <div class="tab-pane active" id="tab-visao-geral">
     <div class="kpi-grid" id="kpi-grid"></div>
-
     <div class="charts-grid">
-
-      <!-- Evolução mensal -->
       <div class="chart-card span2">
         <div class="chart-top">
           <div class="chart-top-left">
@@ -285,14 +349,11 @@ input[type=date]:focus{border-color:#378ADD}
         <div class="cw" style="height:210px"><canvas id="ch-evolucao"></canvas></div>
         <div class="var-bar" id="var-bar"></div>
       </div>
-
-      <!-- Cancelamentos -->
       <div class="chart-card span2">
         <div class="chart-top">
           <span class="chart-title">Cancelamentos por motivo</span>
           <span class="chart-badge" id="cancel-badge">—</span>
         </div>
-        <!-- Inline checkbox filter -->
         <div class="cancel-filter" id="cancel-filter">
           <div class="cancel-filter-header" onclick="toggleCancelFilter()">
             <span class="cancel-filter-title">
@@ -309,8 +370,6 @@ input[type=date]:focus{border-color:#378ADD}
         </div>
         <div class="cw" id="cancel-wrap" style="height:240px"><canvas id="ch-cancel"></canvas></div>
       </div>
-
-      <!-- Seguradora -->
       <div class="chart-card">
         <div class="chart-top">
           <span class="chart-title">Concentração por seguradora</span>
@@ -324,8 +383,6 @@ input[type=date]:focus{border-color:#378ADD}
         <div class="legend" id="seg-legend"></div>
         <div class="cw" style="height:200px"><canvas id="ch-seg"></canvas></div>
       </div>
-
-      <!-- Ramo -->
       <div class="chart-card">
         <div class="chart-top">
           <span class="chart-title">Produção por ramo</span>
@@ -338,291 +395,255 @@ input[type=date]:focus{border-color:#378ADD}
         </div>
         <div class="cw" style="height:200px"><canvas id="ch-ramo"></canvas></div>
       </div>
-
     </div>
   </div>
-</div>
+
+  <!-- ═══ TAB: PRODUÇÃO POR COLABORADOR ═══ -->
+  <div class="tab-pane" id="tab-producao">
+
+    <!-- Section 1: KPIs -->
+    <div class="section-card">
+      <div class="section-header open" id="sh-kpis" onclick="toggleSection('kpis')">
+        <span class="section-title">Indicadores principais <span class="section-title-badge" id="prod-kpi-badge"></span></span>
+        <div class="section-controls">
+          <div class="view-toggle" onclick="event.stopPropagation()">
+            <input type="radio" name="vt-prod" id="vt-colab" value="colab" checked onchange="renderProdTab()">
+            <label for="vt-colab">Colaborador</label>
+            <input type="radio" name="vt-prod" id="vt-grp" value="grp" onchange="renderProdTab()">
+            <label for="vt-grp">Grupo de produção</label>
+          </div>
+          <button class="collapse-btn" id="cb-kpis">−</button>
+        </div>
+      </div>
+      <div class="section-body" id="sb-kpis">
+        <div class="kpi-grid" id="prod-kpi-grid"></div>
+      </div>
+    </div>
+
+    <!-- Section 2: Line chart multi-period -->
+    <div class="section-card">
+      <div class="section-header open" id="sh-chart" onclick="toggleSection('chart')">
+        <span class="section-title">Evolução da produção <span class="section-title-badge">compare períodos</span></span>
+        <div class="section-controls">
+          <div class="metric-toggle" onclick="event.stopPropagation()">
+            <input type="radio" name="mt-prod" id="mt-prod-p" value="premio" checked onchange="renderProdChart()">
+            <label for="mt-prod-p">Prêmio</label>
+            <input type="radio" name="mt-prod" id="mt-prod-c" value="comissao" onchange="renderProdChart()">
+            <label for="mt-prod-c">Comissão</label>
+          </div>
+          <button class="collapse-btn" id="cb-chart">−</button>
+        </div>
+      </div>
+      <div class="section-body" id="sb-chart">
+        <!-- Period picker -->
+        <div class="period-row" id="period-row">
+          <div class="period-add">
+            <input type="date" id="period-start" style="min-width:115px;padding:4px 7px;font-size:11px">
+            <span class="date-sep">→</span>
+            <input type="date" id="period-end" style="min-width:115px;padding:4px 7px;font-size:11px">
+            <button class="btn-sm btn-add" onclick="addPeriod()">+ Adicionar período</button>
+          </div>
+          <div id="period-tags" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+        </div>
+        <div style="padding:12px 0 0">
+          <div class="period-legend" id="period-legend"></div>
+          <div class="cw" style="height:260px"><canvas id="ch-prod-line"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Table -->
+    <div class="section-card">
+      <div class="section-header open" id="sh-table" onclick="toggleSection('table')">
+        <span class="section-title">Tabela de produção <span class="section-title-badge" id="prod-table-badge"></span></span>
+        <div class="section-controls" onclick="event.stopPropagation()">
+          <div class="metric-toggle">
+            <input type="radio" name="mt-tbl" id="mt-tbl-p" value="premio" checked onchange="renderProdTable()">
+            <label for="mt-tbl-p">Prêmio</label>
+            <input type="radio" name="mt-tbl" id="mt-tbl-c" value="comissao" onchange="renderProdTable()">
+            <label for="mt-tbl-c">Comissão</label>
+          </div>
+          <button class="collapse-btn" id="cb-table">−</button>
+        </div>
+      </div>
+      <div class="section-body" id="sb-table" style="padding:0">
+        <div class="prod-table-wrap" id="prod-table-wrap"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-producao -->
+</div><!-- /dash -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────────────────
-let ALL = [], FD = [];
-let activeTipos = new Set();
-// Multi-select state: key → Set of selected values (empty = all selected)
-const MS = { col: new Set(), grp: new Set(), ram: new Set(), seg: new Set() };
-// Cancel motivo filter state: null = all, else Set of selected motivos
-let activeCancelMotivos = null;
-const charts = {};
+let ALL=[], FD=[];
+let activeTipos=new Set();
+const MS={col:new Set(),grp:new Set(),ram:new Set(),seg:new Set()};
+let activeCancelMotivos=null;
+const charts={};
+let sortKey='premio', sortDir='desc';
+// Periods for line chart: [{start,end,label,color}]
+let periods=[];
+const PERIOD_COLORS=['#378ADD','#639922','#E24B4A','#BA7517','#534AB7','#1D9E75','#D4537E'];
 
 // ── Column mapping ─────────────────────────────────────────────────────────────
-const COL = {
-  tipo:'TIPO DE NEGÓCIO', vig:'INÍCIO DE VIGÊNCIA', em:'DATA EMISSÃO',
-  fim:'TÉRMINO DE VIGÊNCIA', cli:'CLIENTE', seg:'SEGURADORA',
-  ramo:'RAMO', grp:'GRUPO DE PRODUÇÃO', premio:'PRÊMIO', com:'COMISSÃO',
-  colab:'COLABORADOR', sit:'SITUAÇÃO', motivo:'MOTIVO CANCELAMENTO', cancel:'DATA CANCELAMENTO'
+const COL={
+  tipo:'TIPO DE NEGÓCIO',vig:'INÍCIO DE VIGÊNCIA',em:'DATA EMISSÃO',
+  fim:'TÉRMINO DE VIGÊNCIA',cli:'CLIENTE',seg:'SEGURADORA',
+  ramo:'RAMO',grp:'GRUPO DE PRODUÇÃO',premio:'PRÊMIO',com:'COMISSÃO',
+  colab:'COLABORADOR',sit:'SITUAÇÃO',motivo:'MOTIVO CANCELAMENTO',cancel:'DATA CANCELAMENTO'
 };
-const TIPO_LABELS = {
-  R:'R — Renovação', N:'N — Negócio novo', ER:'ER — Endosso renov.',
-  EN:'EN — Endosso novo', CR:'CR — Cancel. renov.', CN:'CN — Cancel. novo'
-};
-const PALETA = [
-  '#378ADD','#639922','#E24B4A','#BA7517','#534AB7',
-  '#1D9E75','#D4537E','#888780','#5DCAA5','#F09595','#97C459','#BC8CFF'
-];
+const TIPO_LABELS={R:'R — Renovação',N:'N — Negócio novo',ER:'ER — Endosso renov.',EN:'EN — Endosso novo',CR:'CR — Cancel. renov.',CN:'CN — Cancel. novo'};
+const PALETA=['#378ADD','#639922','#E24B4A','#BA7517','#534AB7','#1D9E75','#D4537E','#888780','#5DCAA5','#F09595','#97C459','#BC8CFF'];
 
 // ── Dark mode helpers ──────────────────────────────────────────────────────────
-const dark     = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
-const axisClr  = () => dark() ? '#8b949e' : '#888888';
-const gridClr  = () => dark() ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.055)';
-const labelClr = () => dark() ? '#c9d1d9' : '#444444';
-const borderClr= () => dark() ? '#161b22' : '#ffffff';
+const dark=()=>window.matchMedia('(prefers-color-scheme: dark)').matches;
+const axisClr=()=>dark()?'#8b949e':'#888888';
+const gridClr=()=>dark()?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.055)';
+const labelClr=()=>dark()?'#c9d1d9':'#444444';
+const borderClr=()=>dark()?'#161b22':'#ffffff';
 
-// ── Formatters ─────────────────────────────────────────────────────────────────
-const fBRL = v => (!v && v!==0) ? '—' :
-  new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}).format(v);
-const fN     = v => new Intl.NumberFormat('pt-BR').format(Math.round(v));
-const fP     = v => (v*100).toFixed(1)+'%';
-const fShort = v => v>=1e6?'R$'+(v/1e6).toFixed(1)+'M':v>=1e3?'R$'+(v/1e3).toFixed(0)+'k':'R$'+Math.round(v);
+// ── Utils ──────────────────────────────────────────────────────────────────────
+const fBRL=v=>(!v&&v!==0)?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}).format(v);
+const fN=v=>new Intl.NumberFormat('pt-BR').format(Math.round(v));
+const fP=v=>(v*100).toFixed(1)+'%';
+const fShort=v=>v>=1e6?'R$'+(v/1e6).toFixed(1)+'M':v>=1e3?'R$'+(v/1e3).toFixed(0)+'k':'R$'+Math.round(v);
+const fPct=v=>v!=null?(v*100).toFixed(1)+'%':'—';
 function toDate(v){
-  if(!v) return null;
-  if(v instanceof Date) return v;
-  if(typeof v==='number') return new Date(Math.round((v-25569)*86400*1000));
-  if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)) return new Date(v+'T00:00:00');
-  const p=new Date(v); return isNaN(p)?null:p;
+  if(!v)return null;if(v instanceof Date)return v;
+  if(typeof v==='number')return new Date(Math.round((v-25569)*86400*1000));
+  if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v))return new Date(v+'T00:00:00');
+  const p=new Date(v);return isNaN(p)?null:p;
 }
-const fmtD   = d => { if(!d) return ''; const dt=toDate(d); return dt?dt.toISOString().slice(0,10):''; };
-const today  = () => new Date();
-const addDays= (d,n)=>{ const r=new Date(d); r.setDate(r.getDate()+n); return r; };
-const getMetric= name=>{ const el=document.querySelector(`input[name="${name}"]:checked`); return el?el.value:'premio'; };
+const fmtD=d=>{if(!d)return'';const dt=toDate(d);return dt?dt.toISOString().slice(0,10):'';};
+const today=()=>new Date();
+const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
+const getMetric=name=>{const el=document.querySelector(`input[name="${name}"]:checked`);return el?el.value:'premio';};
+function mkChart(id,cfg){if(charts[id])charts[id].destroy();const c=document.getElementById(id);if(!c)return;charts[id]=new Chart(c,cfg);}
 
-function mkChart(id,cfg){
-  if(charts[id]) charts[id].destroy();
-  const c=document.getElementById(id); if(!c) return;
-  charts[id]=new Chart(c,cfg);
+// ── Tab navigation ─────────────────────────────────────────────────────────────
+function showTab(id,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='producao') renderProdTab();
 }
 
-// ── Multi-select component ─────────────────────────────────────────────────────
-/*
-  Creates a custom multi-select inside containerId.
-  key: MS state key ('col','grp','ram','seg')
-  vals: array of option strings
-  placeholder: display text when nothing selected
-*/
-function buildMultiSelect(containerId, key, vals, placeholder) {
-  const wrap = document.getElementById(containerId);
-  wrap.innerHTML = '';
+// ── Collapsible sections ───────────────────────────────────────────────────────
+function toggleSection(key){
+  const body=document.getElementById('sb-'+key);
+  const btn=document.getElementById('cb-'+key);
+  const hdr=document.getElementById('sh-'+key);
+  const hidden=body.classList.toggle('hidden');
+  btn.textContent=hidden?'+':'−';
+  hdr.classList.toggle('open',!hidden);
+}
 
-  // Trigger button
-  const trigger = document.createElement('div');
-  trigger.className = 'ms-trigger';
-  trigger.innerHTML = `<span class="ms-trigger-text placeholder">${placeholder}</span><span class="ms-arrow">▼</span>`;
-
-  // Dropdown
-  const dropdown = document.createElement('div');
-  dropdown.className = 'ms-dropdown';
-
-  // Search input
-  const search = document.createElement('input');
-  search.type = 'text';
-  search.className = 'ms-search';
-  search.placeholder = 'Buscar...';
-  search.addEventListener('input', () => filterMsList(list, search.value, vals, key));
+// ── Multi-select ───────────────────────────────────────────────────────────────
+function buildMultiSelect(containerId,key,vals,placeholder){
+  const wrap=document.getElementById(containerId);
+  wrap.innerHTML='';
+  const trigger=document.createElement('div');
+  trigger.className='ms-trigger';
+  trigger.innerHTML=`<span class="ms-trigger-text placeholder">${placeholder}</span><span class="ms-arrow">▼</span>`;
+  const dropdown=document.createElement('div');
+  dropdown.className='ms-dropdown';
+  const search=document.createElement('input');
+  search.type='text';search.className='ms-search';search.placeholder='Buscar...';
+  search.addEventListener('input',()=>renderMsList(list,vals,key,search.value));
   dropdown.appendChild(search);
-
-  // List
-  const list = document.createElement('div');
-  list.className = 'ms-list';
-  renderMsList(list, vals, key);
-  dropdown.appendChild(list);
-
-  // Footer
-  const footer = document.createElement('div');
-  footer.className = 'ms-footer';
-  footer.innerHTML = `<button onclick="msSelectAll('${key}','${containerId}')">Marcar todos</button><button onclick="msClearAll('${key}','${containerId}')">Limpar</button>`;
+  const list=document.createElement('div');list.className='ms-list';
+  renderMsList(list,vals,key);dropdown.appendChild(list);
+  const footer=document.createElement('div');footer.className='ms-footer';
+  footer.innerHTML=`<button onclick="msSelectAll('${key}','${containerId}')">Marcar todos</button><button onclick="msClearAll('${key}','${containerId}')">Limpar</button>`;
   dropdown.appendChild(footer);
-
-  wrap.appendChild(trigger);
-  wrap.appendChild(dropdown);
-
-  // Toggle open/close
-  trigger.addEventListener('click', e => {
+  wrap.appendChild(trigger);wrap.appendChild(dropdown);
+  trigger.addEventListener('click',e=>{
     e.stopPropagation();
-    const isOpen = dropdown.classList.contains('open');
+    const isOpen=dropdown.classList.contains('open');
     closeAllDropdowns();
-    if (!isOpen) {
-      dropdown.classList.add('open');
-      trigger.classList.add('open');
-      search.value = '';
-      renderMsList(list, vals, key);
-      search.focus();
-    }
+    if(!isOpen){dropdown.classList.add('open');trigger.classList.add('open');search.value='';renderMsList(list,vals,key);search.focus();}
   });
-
-  // Store refs
-  wrap._key = key;
-  wrap._vals = vals;
-  wrap._list = list;
-  wrap._trigger = trigger;
-  wrap._placeholder = placeholder;
+  wrap._key=key;wrap._vals=vals;wrap._list=list;wrap._trigger=trigger;wrap._placeholder=placeholder;
   updateMsTrigger(wrap);
 }
-
-function renderMsList(list, vals, key, filterStr='') {
-  const f = filterStr.toLowerCase();
-  const filtered = f ? vals.filter(v=>v.toLowerCase().includes(f)) : vals;
-  if (!filtered.length) {
-    list.innerHTML = '<div class="ms-empty">Nenhum resultado</div>';
-    return;
-  }
-  list.innerHTML = filtered.map(v => {
-    const checked = MS[key].size===0 || MS[key].has(v) ? '' : '';
-    const isChecked = MS[key].has(v) ? 'checked' : '';
-    const id = `ms-${key}-${v.replace(/\W/g,'_')}`;
-    return `<div class="ms-item">
-      <input type="checkbox" id="${id}" ${isChecked} onchange="msToggle('${key}','${v.replace(/'/g,"\\'")}',this.checked)">
-      <label for="${id}" title="${v}">${v}</label>
-    </div>`;
+function renderMsList(list,vals,key,filterStr=''){
+  const f=filterStr.toLowerCase();
+  const filtered=f?vals.filter(v=>v.toLowerCase().includes(f)):vals;
+  if(!filtered.length){list.innerHTML='<div class="ms-empty">Nenhum resultado</div>';return;}
+  list.innerHTML=filtered.map(v=>{
+    const isChecked=MS[key].has(v)?'checked':'';
+    const id=`ms-${key}-${v.replace(/\W/g,'_')}`;
+    return `<div class="ms-item"><input type="checkbox" id="${id}" ${isChecked} onchange="msToggle('${key}','${v.replace(/'/g,"\\'")}',this.checked)"><label for="${id}" title="${v}">${v}</label></div>`;
   }).join('');
 }
-
-function filterMsList(list, query, vals, key) {
-  renderMsList(list, vals, key, query);
-}
-
-function msToggle(key, val, checked) {
-  if (checked) MS[key].add(val);
-  else         MS[key].delete(val);
-  // Update trigger label
-  const wrap = document.querySelector(`[id^="ms-"][id$="${key}"]`) ||
-               [...document.querySelectorAll('.ms-wrap')].find(w=>w._key===key);
-  if (wrap) updateMsTrigger(wrap);
+function msToggle(key,val,checked){
+  if(checked)MS[key].add(val);else MS[key].delete(val);
+  const wrap=[...document.querySelectorAll('.ms-wrap')].find(w=>w._key===key);
+  if(wrap)updateMsTrigger(wrap);
   applyFilters();
 }
-
-function updateMsTrigger(wrap) {
-  const key = wrap._key;
-  const sel = MS[key];
-  const txt = wrap.querySelector('.ms-trigger-text');
-  const trigger = wrap.querySelector('.ms-trigger');
-  // Remove old badge
-  const oldBadge = trigger.querySelector('.ms-badge');
-  if (oldBadge) oldBadge.remove();
-
-  if (sel.size === 0) {
-    txt.textContent = wrap._placeholder;
-    txt.className = 'ms-trigger-text placeholder';
-  } else if (sel.size === 1) {
-    txt.textContent = [...sel][0];
-    txt.className = 'ms-trigger-text';
-  } else {
-    txt.textContent = [...sel][0];
-    txt.className = 'ms-trigger-text';
-    const badge = document.createElement('span');
-    badge.className = 'ms-badge';
-    badge.textContent = '+' + (sel.size - 1);
-    trigger.insertBefore(badge, trigger.querySelector('.ms-arrow'));
+function updateMsTrigger(wrap){
+  const key=wrap._key,sel=MS[key];
+  const txt=wrap.querySelector('.ms-trigger-text');
+  const trigger=wrap.querySelector('.ms-trigger');
+  const oldBadge=trigger.querySelector('.ms-badge');if(oldBadge)oldBadge.remove();
+  if(sel.size===0){txt.textContent=wrap._placeholder;txt.className='ms-trigger-text placeholder';}
+  else if(sel.size===1){txt.textContent=[...sel][0];txt.className='ms-trigger-text';}
+  else{
+    txt.textContent=[...sel][0];txt.className='ms-trigger-text';
+    const badge=document.createElement('span');badge.className='ms-badge';badge.textContent='+'+(sel.size-1);
+    trigger.insertBefore(badge,trigger.querySelector('.ms-arrow'));
   }
 }
+function msSelectAll(key,containerId){const wrap=document.getElementById(containerId);wrap._vals.forEach(v=>MS[key].add(v));renderMsList(wrap._list,wrap._vals,key);updateMsTrigger(wrap);applyFilters();}
+function msClearAll(key,containerId){MS[key].clear();const wrap=document.getElementById(containerId);renderMsList(wrap._list,wrap._vals,key);updateMsTrigger(wrap);applyFilters();}
+function closeAllDropdowns(){document.querySelectorAll('.ms-dropdown.open').forEach(d=>d.classList.remove('open'));document.querySelectorAll('.ms-trigger.open').forEach(t=>t.classList.remove('open'));}
+document.addEventListener('click',closeAllDropdowns);
 
-function msSelectAll(key, containerId) {
-  const wrap = document.getElementById(containerId);
-  wrap._vals.forEach(v => MS[key].add(v));
-  renderMsList(wrap._list, wrap._vals, key);
-  updateMsTrigger(wrap);
-  applyFilters();
-}
-function msClearAll(key, containerId) {
-  MS[key].clear();
-  const wrap = document.getElementById(containerId);
-  renderMsList(wrap._list, wrap._vals, key);
-  updateMsTrigger(wrap);
-  applyFilters();
-}
-
-function closeAllDropdowns() {
-  document.querySelectorAll('.ms-dropdown.open').forEach(d => d.classList.remove('open'));
-  document.querySelectorAll('.ms-trigger.open').forEach(t => t.classList.remove('open'));
-}
-document.addEventListener('click', closeAllDropdowns);
-
-// ── Cancel motivo checkboxes ───────────────────────────────────────────────────
-function buildCancelFilter(canceladas) {
-  const mot = {};
-  canceladas.forEach(r => { const m = r.motivo||'Não informado'; mot[m]=(mot[m]||0)+1; });
-  const sorted = Object.entries(mot).sort((a,b)=>b[1]-a[1]);
-
-  const list = document.getElementById('cancel-cb-list');
-  list.innerHTML = sorted.map(([m,n]) => {
-    const id = 'cb-' + m.replace(/\W/g,'_');
-    const checked = !activeCancelMotivos || activeCancelMotivos.has(m) ? 'checked' : '';
-    return `<div class="cancel-cb-item">
-      <input type="checkbox" id="${id}" ${checked} onchange="cancelCbToggle('${m.replace(/'/g,"\\'")}',this.checked)">
-      <label for="${id}">${m}</label>
-      <span class="cb-count">${n}</span>
-    </div>`;
+// ── Cancel filter ──────────────────────────────────────────────────────────────
+function buildCancelFilter(canceladas){
+  const mot={};canceladas.forEach(r=>{const m=r.motivo||'Não informado';mot[m]=(mot[m]||0)+1;});
+  const sorted=Object.entries(mot).sort((a,b)=>b[1]-a[1]);
+  const list=document.getElementById('cancel-cb-list');
+  list.innerHTML=sorted.map(([m,n])=>{
+    const id='cb-'+m.replace(/\W/g,'_');
+    const checked=!activeCancelMotivos||activeCancelMotivos.has(m)?'checked':'';
+    return `<div class="cancel-cb-item"><input type="checkbox" id="${id}" ${checked} onchange="cancelCbToggle('${m.replace(/'/g,"\\'")}',this.checked)"><label for="${id}">${m}</label><span class="cb-count">${n}</span></div>`;
   }).join('');
-
   updateCancelFilterCount();
 }
-
-function cancelCbToggle(motivo, checked) {
-  // First click — initialize set from all
-  if (!activeCancelMotivos) {
-    const allMotivos = [...document.querySelectorAll('#cancel-cb-list input[type=checkbox]')]
-      .map(cb => cb.id.replace('cb-','').replace(/_/g,' '));
-    // Actually use the label text
-    activeCancelMotivos = new Set(
-      [...document.querySelectorAll('#cancel-cb-list .cancel-cb-item label')].map(l=>l.textContent)
-    );
+function cancelCbToggle(motivo,checked){
+  if(!activeCancelMotivos){
+    activeCancelMotivos=new Set([...document.querySelectorAll('#cancel-cb-list .cancel-cb-item label')].map(l=>l.textContent));
   }
-  if (checked) activeCancelMotivos.add(motivo);
-  else         activeCancelMotivos.delete(motivo);
-  // If all selected, treat as "all"
-  const total = document.querySelectorAll('#cancel-cb-list input[type=checkbox]').length;
-  if (activeCancelMotivos.size >= total) activeCancelMotivos = null;
-  updateCancelFilterCount();
-  renderCancelamentos();
+  if(checked)activeCancelMotivos.add(motivo);else activeCancelMotivos.delete(motivo);
+  const total=document.querySelectorAll('#cancel-cb-list input[type=checkbox]').length;
+  if(activeCancelMotivos.size>=total)activeCancelMotivos=null;
+  updateCancelFilterCount();renderCancelamentos();
 }
-
-function cancelCbAll() {
-  activeCancelMotivos = null;
-  document.querySelectorAll('#cancel-cb-list input[type=checkbox]').forEach(cb=>cb.checked=true);
-  updateCancelFilterCount();
-  renderCancelamentos();
+function cancelCbAll(){activeCancelMotivos=null;document.querySelectorAll('#cancel-cb-list input[type=checkbox]').forEach(cb=>cb.checked=true);updateCancelFilterCount();renderCancelamentos();}
+function cancelCbNone(){activeCancelMotivos=new Set();document.querySelectorAll('#cancel-cb-list input[type=checkbox]').forEach(cb=>cb.checked=false);updateCancelFilterCount();renderCancelamentos();}
+function updateCancelFilterCount(){
+  const total=document.querySelectorAll('#cancel-cb-list input[type=checkbox]').length;
+  const sel=activeCancelMotivos?activeCancelMotivos.size:total;
+  document.getElementById('cancel-filter-count').textContent=sel===total?'todos':sel+' de '+total;
 }
-function cancelCbNone() {
-  activeCancelMotivos = new Set();
-  document.querySelectorAll('#cancel-cb-list input[type=checkbox]').forEach(cb=>cb.checked=false);
-  updateCancelFilterCount();
-  renderCancelamentos();
-}
-function updateCancelFilterCount() {
-  const total = document.querySelectorAll('#cancel-cb-list input[type=checkbox]').length;
-  const sel   = activeCancelMotivos ? activeCancelMotivos.size : total;
-  const el    = document.getElementById('cancel-filter-count');
-  el.textContent = sel === total ? 'todos' : sel+' de '+total;
-}
-
-function toggleCancelFilter() {
-  const list  = document.getElementById('cancel-cb-list');
-  const arrow = document.getElementById('cancel-filter-arrow');
-  const open  = list.classList.toggle('open');
-  arrow.classList.toggle('open', open);
+function toggleCancelFilter(){
+  const list=document.getElementById('cancel-cb-list');
+  const arrow=document.getElementById('cancel-filter-arrow');
+  const open=list.classList.toggle('open');
+  arrow.classList.toggle('open',open);
 }
 
 // ── File handling ──────────────────────────────────────────────────────────────
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('upload-zone').classList.remove('drag');
-  const f=e.dataTransfer.files[0]; if(f) handleFile(f);
-}
-function setProgress(pct,msg) {
-  document.getElementById('progress-bar-fill').style.width=pct+'%';
-  document.getElementById('progress-text').textContent=msg;
-}
-function handleFile(file) {
-  if(!file) return;
+function handleDrop(e){e.preventDefault();document.getElementById('upload-zone').classList.remove('drag');const f=e.dataTransfer.files[0];if(f)handleFile(f);}
+function setProgress(pct,msg){document.getElementById('progress-bar-fill').style.width=pct+'%';document.getElementById('progress-text').textContent=msg;}
+function handleFile(file){
+  if(!file)return;
   document.getElementById('upload-zone').style.display='none';
   document.getElementById('progress-wrap').style.display='block';
   document.getElementById('progress-label').textContent=file.name;
@@ -637,14 +658,12 @@ function handleFile(file) {
         const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
         setProgress(80,'Calculando indicadores...');
         ALL=rows.map(r=>({
-          tipo:   String(r[COL.tipo]  ||'').trim(),
-          vig:    toDate(r[COL.vig]),   em:     toDate(r[COL.em]),
-          fim:    toDate(r[COL.fim]),   cli:    String(r[COL.cli]  ||''),
-          seg:    String(r[COL.seg]   ||''),   ramo:   String(r[COL.ramo] ||''),
-          grp:    String(r[COL.grp]   ||''),   premio: parseFloat(r[COL.premio])||0,
-          com:    parseFloat(r[COL.com])||0,   colab:  String(r[COL.colab]||''),
-          sit:    String(r[COL.sit]   ||''),   motivo: String(r[COL.motivo]||''),
-          cancel: toDate(r[COL.cancel])
+          tipo:String(r[COL.tipo]||'').trim(),vig:toDate(r[COL.vig]),em:toDate(r[COL.em]),
+          fim:toDate(r[COL.fim]),cli:String(r[COL.cli]||''),seg:String(r[COL.seg]||''),
+          ramo:String(r[COL.ramo]||''),grp:String(r[COL.grp]||''),
+          premio:parseFloat(r[COL.premio])||0,com:parseFloat(r[COL.com])||0,
+          colab:String(r[COL.colab]||''),sit:String(r[COL.sit]||''),
+          motivo:String(r[COL.motivo]||''),cancel:toDate(r[COL.cancel])
         }));
         setProgress(100,'Pronto!');
         setTimeout(()=>initDash(file.name),300);
@@ -659,104 +678,82 @@ function handleFile(file) {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
-function initDash(fname) {
-  FD=[...ALL]; activeTipos=new Set();
-  Object.keys(MS).forEach(k=>MS[k].clear());
-  activeCancelMotivos=null;
+function initDash(fname){
+  FD=[...ALL];activeTipos=new Set();Object.keys(MS).forEach(k=>MS[k].clear());activeCancelMotivos=null;periods=[];
   document.getElementById('upload-screen').style.display='none';
   document.getElementById('dash').style.display='block';
   document.getElementById('dash-subtitle').textContent=fname+' · '+fN(ALL.length)+' registros';
   document.getElementById('rec-badge').textContent=fN(ALL.length)+' registros';
-  populateFilters();
-  buildTipoBtns();
-  render();
+  populateFilters();buildTipoBtns();render();
 }
 
-// ── Populate filters ───────────────────────────────────────────────────────────
-function populateFilters() {
-  const uniq = field => [...new Set(ALL.map(r=>r[field]).filter(Boolean))].sort();
-  buildMultiSelect('ms-col', 'col', uniq('colab'), 'Todos');
-  buildMultiSelect('ms-grp', 'grp', uniq('grp'),   'Todos');
-  buildMultiSelect('ms-ram', 'ram', uniq('ramo'),   'Todos');
-  buildMultiSelect('ms-seg', 'seg', uniq('seg'),    'Todas');
-  ['f-vig-s','f-vig-e','f-em-s','f-em-e'].forEach(id=>
-    document.getElementById(id).addEventListener('change',applyFilters));
+// ── Filters ────────────────────────────────────────────────────────────────────
+function populateFilters(){
+  const uniq=field=>[...new Set(ALL.map(r=>r[field]).filter(Boolean))].sort();
+  buildMultiSelect('ms-col','col',uniq('colab'),'Todos');
+  buildMultiSelect('ms-grp','grp',uniq('grp'),'Todos');
+  buildMultiSelect('ms-ram','ram',uniq('ramo'),'Todos');
+  buildMultiSelect('ms-seg','seg',uniq('seg'),'Todas');
+  ['f-vig-s','f-vig-e','f-em-s','f-em-e'].forEach(id=>document.getElementById(id).addEventListener('change',applyFilters));
 }
-
-function buildTipoBtns() {
+function buildTipoBtns(){
   const tipos=[...new Set(ALL.map(r=>r.tipo).filter(Boolean))].sort();
-  const c=document.getElementById('tipo-btns'); c.innerHTML='';
+  const c=document.getElementById('tipo-btns');c.innerHTML='';
   tipos.forEach(t=>{
-    const btn=document.createElement('button');
-    btn.className='tipo-btn'; btn.textContent=TIPO_LABELS[t]||t; btn.dataset.tipo=t;
-    btn.addEventListener('click',()=>toggleTipo(t,btn)); c.appendChild(btn);
+    const btn=document.createElement('button');btn.className='tipo-btn';btn.textContent=TIPO_LABELS[t]||t;btn.dataset.tipo=t;
+    btn.addEventListener('click',()=>toggleTipo(t,btn));c.appendChild(btn);
   });
 }
-
-function toggleTipo(t,btn){
-  activeTipos.has(t)?(activeTipos.delete(t),btn.classList.remove('active')):(activeTipos.add(t),btn.classList.add('active'));
-  applyFilters();
-}
-
-// ── Apply filters ──────────────────────────────────────────────────────────────
-function applyFilters() {
-  const vs=document.getElementById('f-vig-s').value, ve=document.getElementById('f-vig-e').value;
-  const es=document.getElementById('f-em-s').value,  ee=document.getElementById('f-em-e').value;
+function toggleTipo(t,btn){activeTipos.has(t)?(activeTipos.delete(t),btn.classList.remove('active')):(activeTipos.add(t),btn.classList.add('active'));applyFilters();}
+function applyFilters(){
+  const vs=document.getElementById('f-vig-s').value,ve=document.getElementById('f-vig-e').value;
+  const es=document.getElementById('f-em-s').value,ee=document.getElementById('f-em-e').value;
   FD=ALL.filter(r=>{
-    if(vs&&r.vig&&fmtD(r.vig)<vs) return false;
-    if(ve&&r.vig&&fmtD(r.vig)>ve) return false;
-    if(es&&r.em&&fmtD(r.em)<es)   return false;
-    if(ee&&r.em&&fmtD(r.em)>ee)   return false;
-    if(MS.col.size>0&&!MS.col.has(r.colab)) return false;
-    if(MS.grp.size>0&&!MS.grp.has(r.grp))   return false;
-    if(MS.ram.size>0&&!MS.ram.has(r.ramo))   return false;
-    if(MS.seg.size>0&&!MS.seg.has(r.seg))    return false;
-    if(activeTipos.size>0&&!activeTipos.has(r.tipo)) return false;
+    if(vs&&r.vig&&fmtD(r.vig)<vs)return false;if(ve&&r.vig&&fmtD(r.vig)>ve)return false;
+    if(es&&r.em&&fmtD(r.em)<es)return false;if(ee&&r.em&&fmtD(r.em)>ee)return false;
+    if(MS.col.size>0&&!MS.col.has(r.colab))return false;if(MS.grp.size>0&&!MS.grp.has(r.grp))return false;
+    if(MS.ram.size>0&&!MS.ram.has(r.ramo))return false;if(MS.seg.size>0&&!MS.seg.has(r.seg))return false;
+    if(activeTipos.size>0&&!activeTipos.has(r.tipo))return false;
     return true;
   });
   document.getElementById('rec-badge').textContent=fN(FD.length)+' registros';
-  // Reset cancel filter when main filters change
   activeCancelMotivos=null;
   render();
+  // Re-render prod tab if active
+  if(document.getElementById('tab-producao').classList.contains('active')) renderProdTab();
 }
-
-function resetFilters() {
+function resetFilters(){
   ['f-vig-s','f-vig-e','f-em-s','f-em-e'].forEach(id=>document.getElementById(id).value='');
   Object.keys(MS).forEach(k=>MS[k].clear());
-  // Rebuild triggers
-  ['col','grp','ram','seg'].forEach(k=>{
-    const wrap=[...document.querySelectorAll('.ms-wrap')].find(w=>w._key===k);
-    if(wrap){ renderMsList(wrap._list,wrap._vals,k); updateMsTrigger(wrap); }
-  });
-  activeTipos=new Set();
-  document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
-  activeCancelMotivos=null;
-  FD=[...ALL];
+  [...document.querySelectorAll('.ms-wrap')].forEach(w=>{if(w._key){renderMsList(w._list,w._vals,w._key);updateMsTrigger(w);}});
+  activeTipos=new Set();document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
+  activeCancelMotivos=null;FD=[...ALL];
   document.getElementById('rec-badge').textContent=fN(FD.length)+' registros';
   render();
+  if(document.getElementById('tab-producao').classList.contains('active')) renderProdTab();
 }
 
 // ── Render all ─────────────────────────────────────────────────────────────────
-function render(){ renderKPIs(); renderEvolucao(); renderCancelamentos(); renderSeguradora(); renderRamo(); }
+function render(){renderKPIs();renderEvolucao();renderCancelamentos();renderSeguradora();renderRamo();}
 
 // ── KPIs ───────────────────────────────────────────────────────────────────────
 function renderKPIs(){
-  const d=FD, premio=d.reduce((s,r)=>s+r.premio,0), com=d.reduce((s,r)=>s+r.com,0);
-  const cliSet=new Set(d.map(r=>r.cli)), withP=d.filter(r=>r.premio>0);
+  const d=FD,premio=d.reduce((s,r)=>s+r.premio,0),com=d.reduce((s,r)=>s+r.com,0);
+  const cliSet=new Set(d.map(r=>r.cli)),withP=d.filter(r=>r.premio>0);
   const ticket=withP.length?withP.reduce((s,r)=>s+r.premio,0)/withP.length:0;
-  const cancel=d.filter(r=>r.sit==='Cancelada'), churn=d.length?cancel.length/d.length:0;
-  const todayStr=fmtD(today()), d30=fmtD(addDays(today(),30));
+  const cancel=d.filter(r=>r.sit==='Cancelada'),churn=d.length?cancel.length/d.length:0;
+  const todayStr=fmtD(today()),d30=fmtD(addDays(today(),30));
   const venc30=d.filter(r=>r.fim&&fmtD(r.fim)>=todayStr&&fmtD(r.fim)<=d30).length;
   const renov=d.filter(r=>r.tipo==='R').length;
   const kpis=[
-    {l:'Prêmio total',       v:fBRL(premio),   s:fN(d.length)+' apólices',                      c:'k-blue'  },
-    {l:'Comissão total',     v:fBRL(com),       s:premio?fP(com/premio)+' do prêmio':'—',         c:'k-green' },
-    {l:'Ticket médio',       v:fBRL(ticket),    s:fN(withP.length)+' c/ prêmio',                  c:'k-purple'},
-    {l:'Clientes únicos',    v:fN(cliSet.size), s:'na seleção atual',                              c:'k-teal'  },
-    {l:'Churn (canceladas)', v:fP(churn),       s:fN(cancel.length)+' apólices',                   c:'k-red'   },
-    {l:'Vencendo em 30d',    v:fN(venc30),      s:'renovações pendentes',                          c:'k-amber' },
-    {l:'Renovações',         v:fN(renov),       s:fP(d.length?renov/d.length:0)+' do total',      c:'k-blue'  },
-    {l:'Comissão média',     v:fBRL(withP.length?com/withP.length:0), s:'por apólice',             c:'k-green' },
+    {l:'Prêmio total',v:fBRL(premio),s:fN(d.length)+' apólices',c:'k-blue'},
+    {l:'Comissão total',v:fBRL(com),s:premio?fP(com/premio)+' do prêmio':'—',c:'k-green'},
+    {l:'Ticket médio',v:fBRL(ticket),s:fN(withP.length)+' c/ prêmio',c:'k-purple'},
+    {l:'Clientes únicos',v:fN(cliSet.size),s:'na seleção atual',c:'k-teal'},
+    {l:'Churn (canceladas)',v:fP(churn),s:fN(cancel.length)+' apólices',c:'k-red'},
+    {l:'Vencendo em 30d',v:fN(venc30),s:'renovações pendentes',c:'k-amber'},
+    {l:'Renovações',v:fN(renov),s:fP(d.length?renov/d.length:0)+' do total',c:'k-blue'},
+    {l:'Comissão média',v:fBRL(withP.length?com/withP.length:0),s:'por apólice',c:'k-green'},
   ];
   document.getElementById('kpi-grid').innerHTML=kpis.map(k=>
     `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`
@@ -766,42 +763,24 @@ function renderKPIs(){
 // ── Evolução mensal ────────────────────────────────────────────────────────────
 function renderEvolucao(){
   const field=getMetric('mt-evol')==='comissao'?'com':'premio';
-  const curYear=today().getFullYear(), prevYear=curYear-1;
+  const curYear=today().getFullYear(),prevYear=curYear-1;
   const cur={},prev={};
   FD.forEach(r=>{
-    if(!r.vig) return;
-    const dt=r.vig instanceof Date?r.vig:toDate(r.vig); if(!dt) return;
+    if(!r.vig)return;const dt=r.vig instanceof Date?r.vig:toDate(r.vig);if(!dt)return;
     const y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,'0');
-    if(y===curYear)  cur[m] =(cur[m] ||0)+r[field];
-    else if(y===prevYear) prev[m]=(prev[m]||0)+r[field];
+    if(y===curYear)cur[m]=(cur[m]||0)+r[field];else if(y===prevYear)prev[m]=(prev[m]||0)+r[field];
   });
   const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
   const mLabels=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   document.getElementById('leg-cur').textContent=String(curYear);
   document.getElementById('leg-prev').textContent=String(prevYear);
   const ac=axisClr(),gc=gridClr();
-  mkChart('ch-evolucao',{
-    type:'line',
-    data:{labels:mLabels,datasets:[
-      {label:String(curYear),data:months.map(m=>cur[m]||0),
-       borderColor:'#639922',backgroundColor:'rgba(99,153,34,0.08)',
-       fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#639922',borderWidth:2},
-      {label:String(prevYear),data:months.map(m=>prev[m]||0),
-       borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,0.06)',
-       fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#E24B4A',borderWidth:2,borderDash:[5,3]}
-    ]},
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fBRL(ctx.raw)}}},
-      scales:{
-        x:{ticks:{color:ac,font:{size:11}},grid:{color:gc}},
-        y:{ticks:{color:ac,font:{size:10},callback:fShort},grid:{color:gc}}
-      }
-    }
-  });
+  mkChart('ch-evolucao',{type:'line',data:{labels:mLabels,datasets:[
+    {label:String(curYear),data:months.map(m=>cur[m]||0),borderColor:'#639922',backgroundColor:'rgba(99,153,34,0.08)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#639922',borderWidth:2},
+    {label:String(prevYear),data:months.map(m=>prev[m]||0),borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,0.06)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#E24B4A',borderWidth:2,borderDash:[5,3]}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fBRL(ctx.raw)}}},scales:{x:{ticks:{color:ac,font:{size:11}},grid:{color:gc}},y:{ticks:{color:ac,font:{size:10},callback:fShort},grid:{color:gc}}}}});
   document.getElementById('var-bar').innerHTML=months.map((m,i)=>{
-    const c=cur[m]||0,p=prev[m]||0;
-    let cls='var-neu',txt='—';
+    const c=cur[m]||0,p=prev[m]||0;let cls='var-neu',txt='—';
     if(p>0){const pct=((c-p)/p)*100;cls=pct>=0?'var-pos':'var-neg';txt=(pct>=0?'+':'')+pct.toFixed(1)+'%';}
     else if(c>0){cls='var-pos';txt='novo';}
     return `<div class="var-item ${cls}" title="${mLabels[i]}: ${txt}">${txt}</div>`;
@@ -811,103 +790,238 @@ function renderEvolucao(){
 // ── Cancelamentos ──────────────────────────────────────────────────────────────
 function renderCancelamentos(){
   const canceladas=FD.filter(r=>r.sit==='Cancelada');
-  // Build/refresh the checkbox filter (always reflects current FD)
   buildCancelFilter(canceladas);
-
-  // Apply motivo filter
-  const filtered = activeCancelMotivos
-    ? canceladas.filter(r=>activeCancelMotivos.has(r.motivo||'Não informado'))
-    : canceladas;
-
+  const filtered=activeCancelMotivos?canceladas.filter(r=>activeCancelMotivos.has(r.motivo||'Não informado')):canceladas;
   document.getElementById('cancel-badge').textContent=fN(filtered.length)+' cancelamentos';
-
-  const mot={};
-  filtered.forEach(r=>{ const m=r.motivo||'Não informado'; mot[m]=(mot[m]||0)+1; });
+  const mot={};filtered.forEach(r=>{const m=r.motivo||'Não informado';mot[m]=(mot[m]||0)+1;});
   const sorted=Object.entries(mot).sort((a,b)=>b[1]-a[1]);
-
-  if(!sorted.length){
-    if(charts['ch-cancel']) charts['ch-cancel'].destroy();
-    document.getElementById('cancel-wrap').style.height='60px';
-    return;
-  }
-
+  if(!sorted.length){if(charts['ch-cancel'])charts['ch-cancel'].destroy();document.getElementById('cancel-wrap').style.height='60px';return;}
   document.getElementById('cancel-wrap').style.height=Math.max(220,sorted.length*38+60)+'px';
   const ac=axisClr(),lc=labelClr(),gc=gridClr();
-  mkChart('ch-cancel',{
-    type:'bar',
-    data:{
-      labels:sorted.map(m=>m[0].length>35?m[0].slice(0,32)+'...':m[0]),
-      datasets:[{data:sorted.map(m=>m[1]),
-        backgroundColor:sorted.map((_,i)=>i===0?'rgba(226,75,74,.85)':i<=2?'rgba(226,75,74,.6)':'rgba(226,75,74,.4)'),
-        borderRadius:4}]
-    },
-    options:{
-      indexAxis:'y',responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw+' apólices'}}},
-      scales:{
-        x:{ticks:{color:ac,font:{size:10}},grid:{color:gc}},
-        y:{ticks:{color:lc,font:{size:11}},grid:{display:false}}
-      }
-    }
-  });
+  mkChart('ch-cancel',{type:'bar',data:{labels:sorted.map(m=>m[0].length>35?m[0].slice(0,32)+'...':m[0]),datasets:[{data:sorted.map(m=>m[1]),backgroundColor:sorted.map((_,i)=>i===0?'rgba(226,75,74,.85)':i<=2?'rgba(226,75,74,.6)':'rgba(226,75,74,.4)'),borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw+' apólices'}}},scales:{x:{ticks:{color:ac,font:{size:10}},grid:{color:gc}},y:{ticks:{color:lc,font:{size:11}},grid:{display:false}}}}});
 }
 
 // ── Seguradora ─────────────────────────────────────────────────────────────────
 function renderSeguradora(){
   const field=getMetric('mt-seg')==='comissao'?'com':'premio';
-  const bySeg={};
-  FD.forEach(r=>{ if(r.seg) bySeg[r.seg]=(bySeg[r.seg]||0)+r[field]; });
+  const bySeg={};FD.forEach(r=>{if(r.seg)bySeg[r.seg]=(bySeg[r.seg]||0)+r[field];});
   const sorted=Object.entries(bySeg).sort((a,b)=>b[1]-a[1]);
-  const top8=sorted.slice(0,8), outros=sorted.slice(8).reduce((s,e)=>s+e[1],0);
+  const top8=sorted.slice(0,8),outros=sorted.slice(8).reduce((s,e)=>s+e[1],0);
   const items=outros>0?[...top8,['Outros',outros]]:top8;
   const total=items.reduce((s,e)=>s+e[1],0);
-  const short=n=>n.replace(' CIA DE SEGUROS GERAIS S/A','').replace(' CIA NAC DE SEGUROS S/A','')
-    .replace(' SEGUROS S/A','').replace(' SEGURADORA S/A','').replace(' SEGURADORA','')
-    .replace(' SEGS CORPORATIVOS SA','').trim();
+  const short=n=>n.replace(' CIA DE SEGUROS GERAIS S/A','').replace(' CIA NAC DE SEGUROS S/A','').replace(' SEGUROS S/A','').replace(' SEGURADORA S/A','').replace(' SEGURADORA','').replace(' SEGS CORPORATIVOS SA','').trim();
   const labels=items.map(e=>short(e[0])),colors=PALETA.slice(0,items.length);
-  document.getElementById('seg-legend').innerHTML=labels.map((l,i)=>
-    `<span><span class="leg-dot" style="background:${colors[i]}"></span>${l} ${fP(total?items[i][1]/total:0)}</span>`
-  ).join('');
-  mkChart('ch-seg',{
-    type:'doughnut',
-    data:{labels,datasets:[{data:items.map(e=>e[1]),backgroundColor:colors,borderWidth:2,borderColor:borderClr()}]},
-    options:{
-      responsive:true,maintainAspectRatio:false,cutout:'58%',
-      plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:ctx=>ctx.label+': '+fBRL(ctx.raw)+' ('+fP(total?ctx.raw/total:0)+')'}}}
-    }
-  });
+  document.getElementById('seg-legend').innerHTML=labels.map((l,i)=>`<span><span class="leg-dot" style="background:${colors[i]}"></span>${l} ${fP(total?items[i][1]/total:0)}</span>`).join('');
+  mkChart('ch-seg',{type:'doughnut',data:{labels,datasets:[{data:items.map(e=>e[1]),backgroundColor:colors,borderWidth:2,borderColor:borderClr()}]},options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fBRL(ctx.raw)+' ('+fP(total?ctx.raw/total:0)+')'}}}}}});
 }
 
 // ── Ramo ───────────────────────────────────────────────────────────────────────
 function renderRamo(){
   const field=getMetric('mt-ramo')==='comissao'?'com':'premio';
-  const byR={};
-  FD.forEach(r=>{ if(r.ramo) byR[r.ramo]=(byR[r.ramo]||0)+r[field]; });
+  const byR={};FD.forEach(r=>{if(r.ramo)byR[r.ramo]=(byR[r.ramo]||0)+r[field];});
   const sorted=Object.entries(byR).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const short=n=>n.replace('AUTOMÓVEL - CASCO','Auto — casco').replace('COMPREENSIVO RESIDENCIAL','Comp. residencial')
-    .replace('COMPREENSIVO EMPRESARIAL','Comp. empresarial').replace('COMPREENSIVO CONDOMÍNIO','Comp. condomínio')
-    .replace('RC PROFISSIONAL','RC profissional').replace('VIDA INDIVIDUAL','Vida individual')
-    .replace('VIDA EM GRUPO','Vida em grupo').replace('TRANSPORTE NACIONAL','Transporte nac.')
-    .replace('RISCOS DIVERSOS','Riscos diversos').replace('RISCOS DE ENGENHARIA','Riscos engenharia')
-    .replace('OUTROS RAMOS','Outros ramos').toLowerCase().replace(/^\w/,c=>c.toUpperCase());
+  const short=n=>n.replace('AUTOMÓVEL - CASCO','Auto — casco').replace('COMPREENSIVO RESIDENCIAL','Comp. residencial').replace('COMPREENSIVO EMPRESARIAL','Comp. empresarial').replace('COMPREENSIVO CONDOMÍNIO','Comp. condomínio').replace('RC PROFISSIONAL','RC profissional').replace('VIDA INDIVIDUAL','Vida individual').replace('VIDA EM GRUPO','Vida em grupo').replace('TRANSPORTE NACIONAL','Transporte nac.').replace('RISCOS DIVERSOS','Riscos diversos').replace('RISCOS DE ENGENHARIA','Riscos engenharia').replace('OUTROS RAMOS','Outros ramos').toLowerCase().replace(/^\w/,c=>c.toUpperCase());
   const ac=axisClr(),lc=labelClr(),gc=gridClr();
-  mkChart('ch-ramo',{
-    type:'bar',
-    data:{labels:sorted.map(e=>short(e[0])),
-      datasets:[{data:sorted.map(e=>e[1]),backgroundColor:PALETA.slice(0,sorted.length),borderRadius:4}]},
-    options:{
-      indexAxis:'y',responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fBRL(ctx.raw)}}},
-      scales:{
-        x:{ticks:{color:ac,font:{size:10},callback:fShort},grid:{color:gc}},
-        y:{ticks:{color:lc,font:{size:11}},grid:{display:false}}
-      }
-    }
-  });
+  mkChart('ch-ramo',{type:'bar',data:{labels:sorted.map(e=>short(e[0])),datasets:[{data:sorted.map(e=>e[1]),backgroundColor:PALETA.slice(0,sorted.length),borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fBRL(ctx.raw)}}},scales:{x:{ticks:{color:ac,font:{size:10},callback:fShort},grid:{color:gc}},y:{ticks:{color:lc,font:{size:11}},grid:{display:false}}}}});
 }
 
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(FD.length) render(); });
+// ══════════════════════════════════════════════════════════════════════════════
+// ── PRODUÇÃO TAB ──────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+function getProdGroupKey(){return getMetric('vt-prod')==='grp'?'grp':'colab';}
+function getProdGroupLabel(){return getMetric('vt-prod')==='grp'?'Grupo de produção':'Colaborador';}
+
+// Build aggregation by colab or group
+function buildProdData(data){
+  const key=getProdGroupKey();
+  const map={};
+  data.forEach(r=>{
+    const k=r[key]||'Sem identificação';
+    if(!map[k])map[k]={nome:k,premio:0,com:0,qtd:0,clis:new Set()};
+    map[k].premio+=r.premio;map[k].com+=r.com;map[k].qtd++;
+    if(r.cli)map[k].clis.add(r.cli);
+  });
+  const totalPremio=Object.values(map).reduce((s,v)=>s+v.premio,0);
+  return Object.values(map).map(v=>({
+    ...v,
+    ticket:v.qtd?v.premio/v.qtd:0,
+    pctCom:v.premio?v.com/v.premio:0,
+    pctTotal:totalPremio?v.premio/totalPremio:0,
+    cliCount:v.clis.size
+  }));
+}
+
+function renderProdTab(){
+  renderProdKPIs();
+  renderProdChart();
+  renderProdTable();
+}
+
+// ── Prod KPIs ─────────────────────────────────────────────────────────────────
+function renderProdKPIs(){
+  const d=FD,premio=d.reduce((s,r)=>s+r.premio,0),com=d.reduce((s,r)=>s+r.com,0);
+  const withP=d.filter(r=>r.premio>0);
+  const ticket=withP.length?withP.reduce((s,r)=>s+r.premio,0)/withP.length:0;
+  const rows=buildProdData(d);
+  const topProd=rows.length?rows.reduce((a,b)=>b.premio>a.premio?b:a,rows[0]):{nome:'—',premio:0};
+  const avgCom=premio?com/premio:0;
+  const label=getProdGroupLabel();
+  document.getElementById('prod-kpi-badge').textContent=label;
+  document.getElementById('prod-kpi-grid').innerHTML=[
+    {l:'Prêmio total',v:fBRL(premio),s:fN(d.length)+' apólices',c:'k-blue'},
+    {l:'Comissão total',v:fBRL(com),s:fP(avgCom)+' do prêmio',c:'k-green'},
+    {l:'Ticket médio',v:fBRL(ticket),s:fN(withP.length)+' c/ prêmio',c:'k-purple'},
+    {l:'Nº de '+label.toLowerCase()+'s',v:fN(rows.length),s:'ativos na seleção',c:'k-teal'},
+    {l:'Maior produtor',v:topProd.nome.split(' ')[0],s:fBRL(topProd.premio),c:'k-amber'},
+    {l:'Comissão média %',v:fP(avgCom),s:'sobre o prêmio',c:'k-green'},
+  ].map(k=>`<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+}
+
+// ── Prod line chart (multi-period) ────────────────────────────────────────────
+function addPeriod(){
+  const s=document.getElementById('period-start').value;
+  const e=document.getElementById('period-end').value;
+  if(!s||!e){alert('Selecione data de início e fim.');return;}
+  if(s>e){alert('A data de início deve ser anterior à data de fim.');return;}
+  if(periods.length>=7){alert('Máximo de 7 períodos.');return;}
+  const color=PERIOD_COLORS[periods.length];
+  const label=s.slice(0,7)+' → '+e.slice(0,7);
+  periods.push({start:s,end:e,label,color});
+  document.getElementById('period-start').value='';
+  document.getElementById('period-end').value='';
+  renderPeriodTags();
+  renderProdChart();
+}
+function removePeriod(i){periods.splice(i,1);renderPeriodTags();renderProdChart();}
+function renderPeriodTags(){
+  document.getElementById('period-tags').innerHTML=periods.map((p,i)=>
+    `<div class="period-tag"><span class="pt-dot" style="background:${p.color}"></span><span class="pt-label">${p.label}</span><span class="pt-remove" onclick="removePeriod(${i})">×</span></div>`
+  ).join('');
+}
+
+function renderProdChart(){
+  const field=getMetric('mt-prod')==='comissao'?'com':'premio';
+  const key=getProdGroupKey();
+  const months=['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const mLabels=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const ac=axisClr(),gc=gridClr();
+
+  if(!periods.length){
+    // Default: show current year vs previous like main tab
+    const curYear=today().getFullYear(),prevYear=curYear-1;
+    const cur={},prev={};
+    FD.forEach(r=>{
+      if(!r.vig)return;const dt=r.vig instanceof Date?r.vig:toDate(r.vig);if(!dt)return;
+      const y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,'0');
+      if(y===curYear)cur[m]=(cur[m]||0)+r[field];else if(y===prevYear)prev[m]=(prev[m]||0)+r[field];
+    });
+    document.getElementById('period-legend').innerHTML=
+      `<span><span class="leg-dot" style="background:#639922"></span>${curYear}</span>
+       <span><span class="leg-dot" style="background:#E24B4A;display:inline-block"></span>${prevYear} <span style="opacity:.6;font-size:10px">(tracejado)</span></span>`;
+    mkChart('ch-prod-line',{type:'line',data:{labels:mLabels,datasets:[
+      {label:String(curYear),data:months.map(m=>cur[m]||0),borderColor:'#639922',backgroundColor:'rgba(99,153,34,0.06)',fill:true,tension:.35,pointRadius:3,borderWidth:2},
+      {label:String(prevYear),data:months.map(m=>prev[m]||0),borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,0.04)',fill:true,tension:.35,pointRadius:3,borderWidth:2,borderDash:[5,3]}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fBRL(ctx.raw)}}},scales:{x:{ticks:{color:ac,font:{size:11}},grid:{color:gc}},y:{ticks:{color:ac,font:{size:10},callback:fShort},grid:{color:gc}}}}});
+    return;
+  }
+
+  // Custom periods
+  const datasets=periods.map(p=>{
+    const byMonth={};
+    ALL.filter(r=>{
+      if(!r.vig)return false;
+      const d=fmtD(r.vig);return d>=p.start&&d<=p.end;
+    }).forEach(r=>{
+      const dt=toDate(r.vig);if(!dt)return;
+      const m=String(dt.getMonth()+1).padStart(2,'0');
+      byMonth[m]=(byMonth[m]||0)+r[field];
+    });
+    return{label:p.label,data:months.map(m=>byMonth[m]||0),borderColor:p.color,backgroundColor:p.color+'18',fill:false,tension:.35,pointRadius:3,borderWidth:2};
+  });
+
+  document.getElementById('period-legend').innerHTML=periods.map(p=>
+    `<span><span class="leg-dot" style="background:${p.color}"></span>${p.label}</span>`
+  ).join('');
+
+  mkChart('ch-prod-line',{type:'line',data:{labels:mLabels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fBRL(ctx.raw)}}},scales:{x:{ticks:{color:ac,font:{size:11}},grid:{color:gc}},y:{ticks:{color:ac,font:{size:10},callback:fShort},grid:{color:gc}}}}});
+}
+
+// ── Prod table ─────────────────────────────────────────────────────────────────
+function renderProdTable(){
+  const field=getMetric('mt-tbl')==='comissao'?'com':'premio';
+  const label=getProdGroupLabel();
+  let rows=buildProdData(FD);
+  const maxPremio=rows.length?Math.max(...rows.map(r=>r.premio)):1;
+
+  // Sort
+  rows.sort((a,b)=>{
+    const va=a[sortKey]??0,vb=b[sortKey]??0;
+    return sortDir==='asc'?va-vb:vb-va;
+  });
+
+  document.getElementById('prod-table-badge').textContent=rows.length+' '+label.toLowerCase()+'s';
+
+  const totPremio=rows.reduce((s,r)=>s+r.premio,0);
+  const totCom=rows.reduce((s,r)=>s+r.com,0);
+  const totQtd=rows.reduce((s,r)=>s+r.qtd,0);
+  const totTicket=totQtd?totPremio/totQtd:0;
+  const totPctCom=totPremio?totCom/totPremio:0;
+
+  const thClass=k=>k===sortKey?(sortDir==='asc'?'sort-asc':'sort-desc'):'';
+  const th=(k,lbl)=>`<th class="${thClass(k)}" onclick="setSort('${k}')">${lbl}<span class="sort-icon"></span></th>`;
+
+  const rankBadge=(i)=>{
+    const cls=i===0?'r1':i===1?'r2':i===2?'r3':'';
+    return`<span class="rank-badge ${cls}">${i+1}</span>`;
+  };
+
+  const tbody=rows.map((r,i)=>{
+    const pct=maxPremio?r.premio/maxPremio:0;
+    return`<tr>
+      <td>${rankBadge(i)}</td>
+      <td class="name-cell" title="${r.nome}">${r.nome}</td>
+      <td class="num">${fBRL(r.premio)}<div class="bar-fill-bg"><div class="bar-fill" style="width:${(pct*100).toFixed(1)}%;background:#378ADD"></div></div></td>
+      <td class="num">${fBRL(r.com)}</td>
+      <td class="num">${fPct(r.pctCom)}</td>
+      <td class="num">${fBRL(r.ticket)}</td>
+      <td class="num">${fN(r.qtd)}</td>
+      <td class="num">${fPct(r.pctTotal)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('prod-table-wrap').innerHTML=`
+    <table class="prod-table">
+      <thead><tr>
+        <th style="width:36px">#</th>
+        ${th('nome',label)}
+        ${th('premio','Prêmio líquido')}
+        ${th('com','Comissão')}
+        ${th('pctCom','Com. média %')}
+        ${th('ticket','Ticket médio')}
+        ${th('qtd','Qtd. apólices')}
+        ${th('pctTotal','% participação')}
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+      <tfoot><tr>
+        <td colspan="2" style="font-size:11px;color:#666">Total</td>
+        <td class="num">${fBRL(totPremio)}</td>
+        <td class="num">${fBRL(totCom)}</td>
+        <td class="num">${fPct(totPctCom)}</td>
+        <td class="num">${fBRL(totTicket)}</td>
+        <td class="num">${fN(totQtd)}</td>
+        <td class="num">100%</td>
+      </tr></tfoot>
+    </table>`;
+}
+
+function setSort(key){
+  if(sortKey===key)sortDir=sortDir==='desc'?'asc':'desc';
+  else{sortKey=key;sortDir='desc';}
+  renderProdTable();
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(FD.length)render();});
 </script>
 </body>
 </html>
