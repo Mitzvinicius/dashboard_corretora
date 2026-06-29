@@ -2527,6 +2527,7 @@ function openKickoff() {
         <button class="kf-nav" onclick="kickoffNav(-1)">‹ Anterior</button>
         <div class="kf-dots" id="kf-dots"></div>
         <button class="kf-nav" onclick="kickoffNav(1)">Próximo ›</button>
+        <button class="kf-nav kf-pdf-btn" id="kf-pdf-btn" onclick="exportKickoffPdf()" title="Baixar a apresentação em PDF">↓ Exportar PDF</button>
       </div>`;
     document.body.appendChild(ov);
   }
@@ -2622,6 +2623,64 @@ function closeKickoff() {
   if (ov) ov.style.display = 'none';
   kfDestroyCharts();
   if (kickoffKeyHandler) { document.removeEventListener('keydown', kickoffKeyHandler); kickoffKeyHandler = null; }
+}
+
+// Gera um PDF (paisagem 16:9, um slide por página) da apresentação atual.
+// Captura cada slide renderizado com html2canvas e empilha no jsPDF.
+async function exportKickoffPdf() {
+  if (kickoffMode !== 'show' || !kickoffSlides.length) return;
+  if (!window.jspdf || !window.html2canvas) {
+    alert('Bibliotecas de PDF não carregaram (verifique a conexão). Tente recarregar a página.');
+    return;
+  }
+  const btn = document.getElementById('kf-pdf-btn');
+  const label = btn ? btn.textContent : '';
+  const savedIdx = kickoffIdx;
+  // Desliga a animação dos gráficos para capturá-los já completos.
+  const prevAnim = Chart.defaults.animation;
+  Chart.defaults.animation = false;
+  if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const W = 1280, H = 720; // página 16:9
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [W, H] });
+    for (let i = 0; i < kickoffSlides.length; i++) {
+      kickoffIdx = i;
+      renderKickoffSlide();
+      if (btn) btn.textContent = `Gerando... ${i + 1}/${kickoffSlides.length}`;
+      // Espera o fade do slide (kf-in .35s) e o gráfico desenhar.
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise(r => setTimeout(r, 450));
+      const page = document.querySelector('#kf-stage .kf-page');
+      if (!page) continue;
+      const canvas = await window.html2canvas(page, {
+        scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true,
+        onclone: (doc) => {
+          // No clone, a animação de entrada (kf-in) recomeça e o html2canvas
+          // capturaria o slide em opacity:0 / deslocado. Fixa no estado final.
+          doc.querySelectorAll('.kf-page').forEach(el => {
+            el.style.animation = 'none';
+            el.style.opacity = '1';
+            el.style.transform = 'none';
+          });
+        }
+      });
+      const img = canvas.toDataURL('image/jpeg', 0.92);
+      if (i > 0) pdf.addPage([W, H], 'landscape');
+      pdf.addImage(img, 'JPEG', 0, 0, W, H);
+    }
+    const cover = kickoffSlides.find(s => s.type === 'cover');
+    const nome = (cover && cover.mes ? cover.mes : 'apresentacao').toString().toLowerCase().replace(/\s+/g, '-');
+    pdf.save(`kickoff-${nome}.pdf`);
+  } catch (e) {
+    console.error('[kickoff PDF]', e);
+    alert('Não foi possível gerar o PDF: ' + (e.message || e));
+  } finally {
+    Chart.defaults.animation = prevAnim;
+    kickoffIdx = savedIdx;
+    renderKickoffSlide();
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
 }
 
 function renderMetasColabTable() {

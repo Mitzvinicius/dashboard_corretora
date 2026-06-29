@@ -2468,6 +2468,8 @@ input[type=date]:focus {
   transition: border-color .15s, background .15s;
 }
 .kf-nav:hover { border-color: var(--accent); background: var(--bg-raised); }
+.kf-nav:disabled { opacity: .6; cursor: wait; }
+.kf-pdf-btn { border-color: var(--accent); color: var(--accent); }
 .kf-dots { display: flex; gap: 10px; }
 .kf-pgdot {
   width: 10px; height: 10px;
