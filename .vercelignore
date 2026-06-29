@@ -1,0 +1,18 @@
+# Só o app web estático deve ir para o site público.
+# Tudo listado aqui NÃO é publicado no Vercel (sintaxe igual ao .gitignore).
+
+# Backend / scripts locais (não fazem parte do site)
+scripts/
+launch_dashboard.py
+Abrir Dashboard.bat
+
+# Ferramenta separada
+conversor_ghl/
+
+# Documentação e config de editor
+*.md
+.claude/
+.vscode/
+.gitignore
+
+# (Permanecem publicados: index.html, auth.html, main.js, styles.css)
