@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Autenticando...</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5; color: #333; }
+    .box { text-align: center; padding: 24px; max-width: 420px; }
+    p { font-size: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <p>Concluindo login Microsoft 365...</p>
+  </div>
+  <script>
+    // Esta página é o redirect URI do Azure AD.
+    // Em popup (window.opener existe): MSAL na janela pai lê esta URL e fecha o popup.
+    //   → não fazemos nada, deixamos a MSAL processar.
+    // Em redirect (window.opener nulo): a navegação principal voltou aqui;
+    //   redirecionamos para dashboard.html preservando o ?code=... para a MSAL processar lá.
+    (function () {
+      var inPopup = !!(window.opener && window.opener !== window);
+      if (inPopup) return;
+      var q = window.location.search;
+      var path = window.location.pathname.replace(/auth\.html$/i, 'dashboard.html');
+      window.location.replace(window.location.origin + path + q);
+    })();
+  </script>
+</body>
+</html>

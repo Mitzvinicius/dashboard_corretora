@@ -1,0 +1,28 @@
+# ── Segredos / configuração local — NUNCA versionar ──
+.env
+# (o .env.example, que é só template, continua versionado)
+
+# ── Logs ──
+*.log
+
+# ── Cache de dados baixados do SharePoint (planilhas de produção) ──
+cache/
+scripts/cache/
+
+# ── Backups locais ──
+backup_*/
+
+# ── Python ──
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Config local do editor / Claude ──
+.claude/settings.local.json
+.claude/skills/
+
+# ── Arquivos de sistema operacional ──
+Thumbs.db
+.DS_Store
+desktop.ini

@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversor GHL — Renovações</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0f0f0f;
+      --bg2: #1a1a1a;
+      --bg3: #242424;
+      --bg4: #2e2e2e;
+      --border: #333;
+      --border2: #444;
+      --text: #f0f0f0;
+      --text2: #aaa;
+      --text3: #666;
+      --accent: #3b82f6;
+      --accent2: #1d6ada;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --radius: 8px;
+      --font: 'DM Sans', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono&display=swap');
+
+    /* Layout */
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .header {
+      margin-bottom: 2.5rem;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      color: var(--text);
+    }
+
+    .header p {
+      color: var(--text2);
+      margin-top: 4px;
+      font-size: 13px;
+    }
+
+    /* Steps */
+    .steps {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 2rem;
+      align-items: center;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text3);
+    }
+
+    .step.active {
+      color: var(--text);
+    }
+
+    .step.done {
+      color: var(--green);
+    }
+
+    .step-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--border2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    .step.active .step-num {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .step.done .step-num {
+      border-color: var(--green);
+      color: var(--green);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .step-div {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+      max-width: 40px;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 1.5px dashed var(--border2);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--bg2);
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .upload-icon {
+      font-size: 32px;
+      color: var(--text3);
+      margin-bottom: 12px;
+    }
+
+    .upload-zone h3 {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .upload-zone p {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-header h2 {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    /* Stats */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat {
+      background: var(--bg3);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .stat-value.green {
+      color: var(--green);
+    }
+
+    .stat-value.red {
+      color: var(--red);
+    }
+
+    .stat-value.yellow {
+      color: var(--yellow);
+    }
+
+    /* Mapping table */
+    .map-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .map-table th {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .map-table td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+
+    .map-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .map-table tr:hover td {
+      background: var(--bg3);
+    }
+
+    .tag-original {
+      display: inline-block;
+      background: var(--bg4);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-family: 'DM Mono', monospace;
+      color: var(--text2);
+    }
+
+    .badge-ok {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #4ade80;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+
+    .badge-warn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+
+    .select-map {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      width: 100%;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .select-map:focus {
+      border-color: var(--accent);
+    }
+
+    .select-map.unmapped {
+      border-color: var(--red);
+      background: rgba(239, 68, 68, 0.08);
+      color: var(--red);
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+    }
+
+    .tab {
+      padding: 10px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text2);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content {
+      display: none;
+      padding: 20px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Count badge */
+    .count-badge {
+      display: inline-block;
+      background: var(--bg4);
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 11px;
+      color: var(--text3);
+      margin-left: 6px;
+    }
+
+    .count-badge.warn {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent2);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent2);
+    }
+
+    .btn-primary:disabled {
+      background: var(--bg4);
+      color: var(--text3);
+      border-color: var(--border);
+      cursor: not-allowed;
+    }
+
+    .btn-ghost {
+      background: var(--bg3);
+      color: var(--text2);
+      border-color: var(--border2);
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg4);
+      color: var(--text);
+    }
+
+    .btn-green {
+      background: var(--green);
+      color: #000;
+    }
+
+    .btn-green:hover {
+      background: #16a34a;
+    }
+
+    /* Actions bar */
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 1.5rem;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    /* Alert */
+    .alert {
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 1rem;
+    }
+
+    .alert-warn {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+    }
+
+    .alert-info {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    /* Preview table */
+    .preview-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .preview-table th {
+      background: var(--bg3);
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+    }
+
+    .preview-table td {
+      padding: 7px 12px;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      white-space: nowrap;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .preview-table tr:hover td {
+      background: var(--bg3);
+    }
+
+    .preview-table td.vig-antes {
+      color: var(--text3);
+    }
+
+    .preview-table td.vig-depois {
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    /* Hidden */
+    .hidden {
+      display: none !important;
+    }
+
+    /* Section title */
+    .section-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    /* Search */
+    .search-input {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 7px 12px;
+      font-size: 13px;
+      width: 220px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+    }
+
+    .pill-blue {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+    }
+
+    .pill-green {
+      background: rgba(34, 197, 94, 0.12);
+      color: #4ade80;
+    }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    .footer-note {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <div class="header">
+      <h1>Conversor de Renovações → GHL</h1>
+      <p>Faça upload da planilha de renovações para gerar o CSV pronto para importação no GoHighLevel</p>
+    </div>
+
+    <div class="steps" id="steps-bar">
+      <div class="step active" id="step1">
+        <div class="step-num">1</div> Upload
+      </div>
+      <div class="step-div"></div>
+      <div class="step" id="step2">
+        <div class="step-num">2</div> Mapeamento
+      </div>
+      <div class="step-div"></div>
+      <div class="step" id="step3">
+        <div class="step-num">3</div> Revisão
+      </div>
+      <div class="step-div"></div>
+      <div class="step" id="step4">
+        <div class="step-num">4</div> Exportar
+      </div>
+    </div>
+
+    <!-- STEP 1: Upload -->
+    <div id="section-upload">
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">📂</div>
+        <h3>Arraste a planilha ou clique para selecionar</h3>
+        <p>Aceita .xlsx, .xls — relatório RptApoliceARenovarPorData ou RptAnaliseProducao</p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv">
+    </div>
+
+    <!-- STEP 2+: Mapping & Preview -->
+    <div id="section-main" class="hidden">
+
+      <!-- Stats -->
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Total de registros</div>
+          <div class="stat-value" id="stat-total">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Com telefone</div>
+          <div class="stat-value green" id="stat-phone">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Ramos não mapeados</div>
+          <div class="stat-value red" id="stat-ramos">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Seguradoras não mapeadas</div>
+          <div class="stat-value red" id="stat-segs">0</div>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div id="mapping-alert" class="alert alert-warn hidden">
+        ⚠️ Existem itens não mapeados — resolva-os antes de exportar.
+      </div>
+
+      <!-- Card de mapeamento com abas -->
+      <div class="card">
+        <div style="padding: 0 0 0 0;">
+          <div class="tabs">
+            <div class="tab active" onclick="switchTab('ramos')">Ramos <span class="count-badge warn"
+                id="tab-badge-ramos">0</span></div>
+            <div class="tab" onclick="switchTab('segs')">Seguradoras <span class="count-badge warn"
+                id="tab-badge-segs">0</span></div>
+            <div class="tab" onclick="switchTab('tipos')">Tipo de negócio <span class="count-badge warn"
+                id="tab-badge-tipos">0</span></div>
+            <div class="tab" onclick="switchTab('colabs')">Colaboradores <span class="count-badge warn"
+                id="tab-badge-colabs">0</span></div>
+          </div>
+
+          <div class="tab-content active" id="tab-ramos">
+            <div class="section-title">De/Para — Produto → Ramo GHL</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 14px; align-items: center;">
+              <input type="text" class="search-input" placeholder="Filtrar produtos..." id="search-ramos"
+                oninput="filterTable('ramos')">
+              <span style="font-size: 12px; color: var(--text3)" id="ramos-count-label"></span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="map-table" id="table-ramos">
+                <thead>
+                  <tr>
+                    <th>Produto (original)</th>
+                    <th>Qtd</th>
+                    <th>Ramo GHL</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-segs">
+            <div class="section-title">De/Para — Seguradora (relatório) → Seguradora GHL</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 14px; align-items: center;">
+              <input type="text" class="search-input" placeholder="Filtrar seguradoras..." id="search-segs"
+                oninput="filterTable('segs')">
+              <span style="font-size: 12px; color: var(--text3)" id="segs-count-label"></span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="map-table" id="table-segs">
+                <thead>
+                  <tr>
+                    <th>Seguradora (original)</th>
+                    <th>Qtd</th>
+                    <th>Seguradora GHL</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-tipos">
+            <div class="section-title">De/Para — Tipo de negócio (relatório) → Tipo de Negoico GHL</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 14px; align-items: center;">
+              <input type="text" class="search-input" placeholder="Filtrar tipos..." id="search-tipos"
+                oninput="filterTable('tipos')">
+              <span style="font-size: 12px; color: var(--text3)" id="tipos-count-label"></span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="map-table" id="table-tipos">
+                <thead>
+                  <tr>
+                    <th>Tipo (original)</th>
+                    <th>Qtd</th>
+                    <th>Tipo de Negoico GHL</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-colabs">
+            <div class="section-title">De/Para — Colaborador (relatório) → ID GHL</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 14px; align-items: center;">
+              <input type="text" class="search-input" placeholder="Filtrar colaboradores..." id="search-colabs"
+                oninput="filterTable('colabs')">
+              <span style="font-size: 12px; color: var(--text3)" id="colabs-count-label"></span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="map-table" id="table-colabs">
+                <thead>
+                  <tr>
+                    <th>Colaborador (original)</th>
+                    <th>Qtd</th>
+                    <th>ID GHL (Opportunity Owner)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Prévia dos dados <span class="pill pill-blue" id="preview-count">0 linhas</span></h2>
+          <span style="font-size: 12px; color: var(--text3)">Primeiros 10 registros</span>
+        </div>
+        <div class="card-body" style="padding: 0;">
+          <div class="preview-wrap">
+            <table class="preview-table" id="preview-table">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-ghost" onclick="resetApp()">↩ Novo arquivo</button>
+        <div class="spacer"></div>
+        <button class="btn btn-primary" id="btn-export" onclick="exportCSV()">⬇ Baixar CSV para GHL</button>
+      </div>
+      <div class="footer-note" id="unmapped-note"></div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const RAMOS_GHL = [
+      "ACIDENTES PESSOAIS COLETIVO", "ACIDENTES PESSOAIS INDIVIDUAL", "AUTOMÓVEL - CASCO",
+      "CAMINHÃO", "CARTA VERDE", "COMPREENSIVO CONDOMÍNIO", "COMPREENSIVO EMPRESARIAL",
+      "COMPREENSIVO RESIDENCIAL", "EVENTOS ALEATÓRIOS", "FROTA",
+      "GARANTIA SEGURADO - SETOR PÚBLICO", "MARÍTIMOS (CASCO)", "OUTROS RAMOS",
+      "PREVIDÊNCIA", "RC GERAL", "RC PROFISSIONAL", "RCF VEÍCULOS RCFV",
+      "RISCOS DE ENGENHARIA", "RISCOS DIVERSOS", "SAÚDE", "TRANSPORTE NACIONAL",
+      "VIDA EM GRUPO", "VIDA INDIVIDUAL", "VIAGEM"
+    ];
+
+    const SEGS_GHL = [
+      "AFFINITY SEGUROS", "AIG BRASIL INTER. CIA DE SEGS GERAIS", "AKAD SEGUROS",
+      "ALLIANZ SEGUROS S/A", "ARUANA SEGURADORA SA", "AXA SEGUROS BRASIL S/A",
+      "AZOS TECNOLOGIA E CORRETAGEM", "AZUL SEGUROS S/A",
+      "BRADESCO AUTO/RE COMPANHIA DE SEGUROS", "BRADESCO SEGUROS S/A",
+      "CAPEMISA SEGURADORA DE VIDA E PREVIDÊNCIA S/A", "CHUBB SEGUROS BRASIL S.A.",
+      "COMPANHIA EXCELSIOR DE SEGUROS", "ESSOR SEGUROS S.A", "EZZE SEGUROS S.A.",
+      "FAIRFAX BRASIL SEGS CORPORATIVOS SA", "FATOR SEGURADORA S.A.",
+      "HDI SEGUROS DO BRASIL", "HDI SEGUROS S/A", "ICATU SEGUROS S/A",
+      "ITAU SEGUROS DE AUTO E RESIDENCIA S.A.", "ITAU SEGUROS S/A", "MAG SEGUROS",
+      "MAPFRE SEGUROS GERAIS S.A.", "MAPFRE VIDA S.A.",
+      "METROPOLITAN LIFE SEGUROS E PREVIDÊNCIA PRIVADA SA", "OMINT SAUDE",
+      "PASI SEGURADORA", "PORTO SEGURO CIA DE SEGUROS GERAIS S/A", "SOMPO SEGUROS S/A",
+      "SUHAI SEGUROS S/A", "SUL AMERICA CIA NAC DE SEGUROS S/A",
+      "SUL BRASIL CLUBE DE SEGUROS LTDA", "SULAET/PREVIDÊNCIA",
+      "TOKIO MARINE SEGURADORA S/A", "UNIMED SEGURADORA S/A",
+      "UNIMED SEGUROS PATRIMONIAIS S.A.", "UNIMED VIDA", "VITAL CARD",
+      "YELUM SEGURADORA", "ZURICH MINAS BRASIL SEGUROS S/A"
+    ];
+
+    const COLAB_MAP = {
+      "CELSO LUIS SANTOLIN": "AeuzaS0n4T4GLrVQ9Fvv",
+      "CESAR AUGUSTO SANTOLIN": "mwdxWiYxOdGrPzRUAgwL",
+      "DENISE SOUZA": "hbNS9Km21rPzSAwD9WiN",
+      "DIEGO CHEMIN": "mDrtR7nkqXJ6AID7OuFy",
+      "FERNANDO DE PAULA SERAFIM": "zr1oxzVxjh1nU0rIOnYc",
+      "GABRIEL DA SILVA VERAS": "TRicGh0ZjlJWZYmltRjD",
+      "GABRIELA MOZERLE": "LMH8JJDPLa3ldHpmwtay",
+      "GABRIELLE WITT": "JkYWUBdPtpSxoVfnq6Xn",
+      "GUSTAVO HENRIQUE GUIMARÃES VIEIRA": "tOtDuGdDkdqen3KKIIHj",
+      "HEMILY CRISTOVÃO": "PgUHa8nfLKfPnOSKuVD7",
+      "LUIS CARLOS SANTOLIN": "uyz7VgNSiiKuqWctRIZH",
+      "MITZRAEL TASSINARI": "266d5gh42CUG7K3L1mJ7",
+      "NATHALIA LETICIA DA SILVA": "aD6HN1CRw0goTLqtWgoF",
+      "VERA LUCIA PIRES": "KwKoiuil3SzGmpDhvMrZ",
+      "VICTOR DE ANDRADES": "zIJIIMnSln5069ODWiwX",
+    };
+
+
+    // Auto-map rules for ramos
+    const RAMO_RULES = [
+      [/rc\s*prof/i, "RC PROFISSIONAL"],
+      [/residencia|residencial/i, "COMPREENSIVO RESIDENCIAL"],
+      [/auto|casco|automov|automóv/i, "AUTOMÓVEL - CASCO"],
+      [/vida\s*ind/i, "VIDA INDIVIDUAL"],
+      [/vida\s*(em\s*)?gr|vg\s*-|vida\s*glob/i, "VIDA EM GRUPO"],
+      [/empresa|empresar/i, "COMPREENSIVO EMPRESARIAL"],
+      [/sa[uú]de/i, "SAÚDE"],
+      [/viagem/i, "VIAGEM"],
+      [/ac.*pes.*ind|ap\s*est/i, "ACIDENTES PESSOAIS INDIVIDUAL"],
+      [/eng/i, "RISCOS DE ENGENHARIA"],
+      [/condom/i, "COMPREENSIVO CONDOMÍNIO"],
+      [/transp/i, "TRANSPORTE NACIONAL"],
+      [/carta\s*verde/i, "CARTA VERDE"],
+      [/riscos\s*div/i, "RISCOS DIVERSOS"],
+      [/rc\s*ger/i, "RC GERAL"],
+      [/mar[íi]t/i, "MARÍTIMOS (CASCO)"],
+      [/caminh/i, "CAMINHÃO"],
+      [/previd/i, "PREVIDÊNCIA"],
+      [/ac.*pes.*col/i, "ACIDENTES PESSOAIS COLETIVO"],
+      [/frota/i, "FROTA"],
+      [/rcf|rcfv/i, "RCF VEÍCULOS RCFV"],
+      [/garantia/i, "GARANTIA SEGURADO - SETOR PÚBLICO"],
+      [/event/i, "EVENTOS ALEATÓRIOS"],
+    ];
+
+    // Auto-map rules for seguradoras
+    const SEG_RULES = [
+      [/akad/i, "AKAD SEGUROS"],
+      [/allianz/i, "ALLIANZ SEGUROS S/A"],
+      [/affinity/i, "AFFINITY SEGUROS"],
+      [/aig/i, "AIG BRASIL INTER. CIA DE SEGS GERAIS"],
+      [/aruana/i, "ARUANA SEGURADORA SA"],
+      [/axa/i, "AXA SEGUROS BRASIL S/A"],
+      [/azos/i, "AZOS TECNOLOGIA E CORRETAGEM"],
+      [/azul/i, "AZUL SEGUROS S/A"],
+      [/bradesco.*auto|auto.*bradesco/i, "BRADESCO AUTO/RE COMPANHIA DE SEGUROS"],
+      [/bradesco/i, "BRADESCO SEGUROS S/A"],
+      [/capemisa/i, "CAPEMISA SEGURADORA DE VIDA E PREVIDÊNCIA S/A"],
+      [/chubb/i, "CHUBB SEGUROS BRASIL S.A."],
+      [/excelsior/i, "COMPANHIA EXCELSIOR DE SEGUROS"],
+      [/essor/i, "ESSOR SEGUROS S.A"],
+      [/ezze/i, "EZZE SEGUROS S.A."],
+      [/fairfax/i, "FAIRFAX BRASIL SEGS CORPORATIVOS SA"],
+      [/fator/i, "FATOR SEGURADORA S.A."],
+      [/hdi.*brasil/i, "HDI SEGUROS DO BRASIL"],
+      [/hdi/i, "HDI SEGUROS S/A"],
+      [/icatu/i, "ICATU SEGUROS S/A"],
+      [/ita[uú].*auto|auto.*ita[uú]/i, "ITAU SEGUROS DE AUTO E RESIDENCIA S.A."],
+      [/ita[uú]/i, "ITAU SEGUROS S/A"],
+      [/mag\s*seg|mag\s*\(|mongeral/i, "MAG SEGUROS"],
+      [/mapfre.*vida/i, "MAPFRE VIDA S.A."],
+      [/mapfre/i, "MAPFRE SEGUROS GERAIS S.A."],
+      [/metropolitan/i, "METROPOLITAN LIFE SEGUROS E PREVIDÊNCIA PRIVADA SA"],
+      [/omint/i, "OMINT SAUDE"],
+      [/pasi/i, "PASI SEGURADORA"],
+      [/porto\s*seg/i, "PORTO SEGURO CIA DE SEGUROS GERAIS S/A"],
+      [/sompo/i, "SOMPO SEGUROS S/A"],
+      [/suhai/i, "SUHAI SEGUROS S/A"],
+      [/sul\s*am/i, "SUL AMERICA CIA NAC DE SEGUROS S/A"],
+      [/sul\s*bras/i, "SUL BRASIL CLUBE DE SEGUROS LTDA"],
+      [/sulaet/i, "SULAET/PREVIDÊNCIA"],
+      [/tokio/i, "TOKIO MARINE SEGURADORA S/A"],
+      [/unimed.*patrim/i, "UNIMED SEGUROS PATRIMONIAIS S.A."],
+      [/unimed\s*vida/i, "UNIMED VIDA"],
+      [/unimed/i, "UNIMED SEGURADORA S/A"],
+      [/vital/i, "VITAL CARD"],
+      [/yelum/i, "YELUM SEGURADORA"],
+      [/zurich/i, "ZURICH MINAS BRASIL SEGUROS S/A"],
+    ];
+
+    const TIPOS_GHL = [
+      "Renovação Própria",
+      "Renovação Outra",
+      "Novo",
+      "Endosso"
+    ];
+
+    const TIPO_RULES = [
+      [/renov.*pr[oó]p|ren\.?\s*pr[oó]p|^rp$/i, "Renovação Própria"],
+      [/renov.*outr|ren\.?\s*outr|^ro$/i, "Renovação Outra"],
+      [/seguro\s*novo|^novo$|neg[oó]cio\s*novo/i, "Novo"],
+      [/endosso/i, "Endosso"],
+    ];
+
+    function autoMapRamo(produto) {
+      for (const [rx, ramo] of RAMO_RULES) {
+        if (rx.test(produto)) return ramo;
+      }
+      return null;
+    }
+
+    function autoMapSeg(seg) {
+      for (const [rx, name] of SEG_RULES) {
+        if (rx.test(seg)) return name;
+      }
+      return null;
+    }
+
+    function autoMapTipo(valor) {
+      const v = String(valor || '').trim();
+      if (!v) return null;
+      const exact = TIPOS_GHL.find(t => t.toLowerCase() === v.toLowerCase());
+      if (exact) return exact;
+      for (const [rx, tipo] of TIPO_RULES) {
+        if (rx.test(v)) return tipo;
+      }
+      return null;
+    }
+
+    function getMap(type) {
+      if (type === 'ramos') return ramoMap;
+      if (type === 'colabs') return colabMap;
+      if (type === 'tipos') return tipoMap;
+      return segMap;
+    }
+
+    let rawData = [];
+    let columns = {};
+    let ramoMap = {};    // produto -> ramo GHL
+    let colabMap = {};   // colaborador -> ID GHL
+    let colabCounts = {};
+    let segMap = {};     // seguradora raw -> seguradora GHL
+    let productCounts = {};
+    let segCounts = {};
+    let tipoCounts = {};
+    let tipoMap = {};
+
+    // Upload handling
+    const zone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+    fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+    function handleFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const wb = XLSX.read(e.target.result, { type: 'binary', cellDates: true });
+        const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('rpt') || n === wb.SheetNames[0]);
+        const ws = wb.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(ws, { raw: false, defval: '' });
+        if (!data.length) { alert('Planilha vazia ou formato não reconhecido.'); return; }
+        processData(data);
+      };
+      reader.readAsBinaryString(file);
+    }
+
+    function detectColumns(sample) {
+      const keys = Object.keys(sample);
+      const find = (...terms) => keys.find(k => terms.some(t => k.toLowerCase().includes(t.toLowerCase()))) || null;
+      return {
+        cliente: find('CLIENTE'),
+        seguradora: find('SEGURADORA'),
+        produto: find('PRODUTO', 'RAMO'),
+        tipo: find('TIPO DE NEGÓCIO', 'TIPO'),
+        ini: find('INÍCIO DE VIGÊNCIA', 'INICIO'),
+        fim: find('TÉRMINO DE VIGÊNCIA', 'TERMINO', 'TÉRMINO'),
+        apolice: find('APÓLICE', 'APOLICE'),
+        premioT: find('PRÊMIO TOTAL'),
+        premioL: find('PRÊMIO LÍQUIDO', 'LIQUIDO'),
+        porcent: find('% COMISSÃO', 'COMISSÃO %', 'PORCENTAGEM'),
+        comissao: find('COMISSÃO', 'COMISSAO'),
+        sinistro: find('SINISTRO'),
+        grupoProd: find('GRUPO DE PRODUÇÃO', 'GRUPO'),
+        colaborador: find('COLABORADOR'),
+        telefone: find('TELEFONE', 'FONE'),
+        situacao: find('SITUAÇÃO', 'SITUACAO'),
+        email: find('E_MAIL', 'EMAIL', 'E-MAIL'),
+        cpfcnpj: find('CPF', 'CNPJ'),
+        parcelas: find('PARCELAS', 'QUANTIDADE DE PARCELAS'),
+        formapag: find('FORMA DE RECEB', 'FORMA DE PAG'),
+      };
+    }
+
+    function fmtDate(val) {
+      if (!val) return '';
+      if (val instanceof Date) {
+        const y = val.getFullYear();
+        const mo = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        return `${y}-${mo}-${d}`;
+      }
+      const s = String(val).trim();
+      // dd/mm/yyyy
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+      return s;
+    }
+
+    function addOneYear(isoDate) {
+      if (!isoDate) return '';
+      const d = new Date(isoDate + 'T12:00:00');
+      if (isNaN(d.getTime())) return '';
+      d.setFullYear(d.getFullYear() + 1);
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${day}`;
+    }
+
+    function fmtDateBr(isoDate) {
+      if (!isoDate) return '';
+      const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return isoDate;
+      return `${m[3]}/${m[2]}/${m[1]}`;
+    }
+
+    function fmtPhone(val) {
+      if (!val) return '';
+      // Pode haver mais de um telefone na mesma célula — pega o primeiro válido.
+      const candidates = String(val).split(/[\/;,|]|\r|\n/);
+      for (const raw of candidates) {
+        let digits = raw.replace(/\D/g, '');
+        if (!digits) continue;
+        // Remove prefixo de discagem internacional "00".
+        digits = digits.replace(/^00/, '');
+        // Já vem com código do Brasil (55 + DDD + 8/9 dígitos).
+        if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+          return `+${digits}`;
+        }
+        // Remove zero de tronco (ex.: "011" → "11").
+        digits = digits.replace(/^0+/, '');
+        // DDD + número nacional → adiciona o código do Brasil.
+        if (digits.length === 10 || digits.length === 11) {
+          return `+55${digits}`;
+        }
+        // Número que já parece internacional (outro país).
+        if (digits.length === 12 || digits.length === 13) {
+          return `+${digits}`;
+        }
+      }
+      // Nada válido → vazio (mantém o CSV em E.164 estrito).
+      return '';
+    }
+
+    function fmtNum(val) {
+      if (val === null || val === undefined || val === '') return '';
+      if (typeof val === 'number') return isNaN(val) ? '' : String(val);
+      let s = String(val).trim();
+      if (!s) return '';
+      // Remove tudo que não é dígito/separador/sinal (R$, %, espaços, etc.)
+      s = s.replace(/[^\d,.\-]/g, '');
+      if (!s) return '';
+
+      const hasComma = s.includes(',');
+      const hasDot = s.includes('.');
+
+      if (hasComma && hasDot) {
+        // Ambos presentes: o ÚLTIMO separador é o decimal.
+        if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+          // BR: pontos são milhar, vírgula é decimal → "8.159,70" → 8159.7
+          s = s.replace(/\./g, '').replace(',', '.');
+        } else {
+          // US: vírgulas são milhar, ponto é decimal → "8,159.70" → 8159.7
+          s = s.replace(/,/g, '');
+        }
+      } else if (hasComma) {
+        // Só vírgulas
+        const count = (s.match(/,/g) || []).length;
+        const afterLast = s.length - s.lastIndexOf(',') - 1;
+        if (count > 1 || afterLast === 3) {
+          // múltiplas vírgulas OU 1 vírgula seguida de exatos 3 dígitos → milhar US
+          s = s.replace(/,/g, '');
+        } else {
+          // decimal BR (ex.: "0,15")
+          s = s.replace(',', '.');
+        }
+      } else if (hasDot) {
+        // Só pontos
+        const count = (s.match(/\./g) || []).length;
+        const afterLast = s.length - s.lastIndexOf('.') - 1;
+        if (count > 1 || afterLast === 3) {
+          // múltiplos pontos OU 1 ponto seguido de exatos 3 dígitos → milhar BR
+          s = s.replace(/\./g, '');
+        }
+        // caso contrário: decimal US (ex.: "0.15"), mantém
+      }
+
+      const n = parseFloat(s);
+      return isNaN(n) ? '' : String(n);
+    }
+
+    function processData(data) {
+      rawData = data;
+      columns = detectColumns(data[0]);
+
+      productCounts = {};
+      segCounts = {};
+      colabCounts = {};
+      tipoCounts = {};
+      data.forEach(row => {
+        const p = String(row[columns.produto] || '').trim().toUpperCase();
+        const s = String(row[columns.seguradora] || '').trim().toUpperCase();
+        const col = String(row[columns.colaborador] || '').trim().toUpperCase();
+        const t = String(row[columns.tipo] || '').trim().toUpperCase();
+        if (p) productCounts[p] = (productCounts[p] || 0) + 1;
+        if (s) segCounts[s] = (segCounts[s] || 0) + 1;
+        if (col) colabCounts[col] = (colabCounts[col] || 0) + 1;
+        if (t) tipoCounts[t] = (tipoCounts[t] || 0) + 1;
+      });
+
+      // Auto-map
+      ramoMap = {};
+      Object.keys(productCounts).forEach(p => {
+        ramoMap[p] = autoMapRamo(p) || '__UNMAPPED__';
+      });
+      segMap = {};
+      Object.keys(segCounts).forEach(s => {
+        segMap[s] = autoMapSeg(s) || '__UNMAPPED__';
+      });
+      colabMap = {};
+      Object.keys(colabCounts).forEach(col => {
+        colabMap[col] = COLAB_MAP[col] || '__UNMAPPED__';
+      });
+      tipoMap = {};
+      Object.keys(tipoCounts).forEach(t => {
+        tipoMap[t] = autoMapTipo(t) || '__UNMAPPED__';
+      });
+
+      document.getElementById('section-upload').classList.add('hidden');
+      document.getElementById('section-main').classList.remove('hidden');
+
+      updateStats();
+      renderMappingTable('ramos');
+      renderMappingTable('segs');
+      renderMappingTable('tipos');
+      renderMappingTable('colabs');
+      renderPreview();
+      updateSteps(2);
+    }
+
+    function updateStats() {
+      const total = rawData.length;
+      const withPhone = rawData.filter(r => fmtPhone(r[columns.telefone])).length;
+      const unmappedRamos = Object.values(ramoMap).filter(v => v === '__UNMAPPED__').length;
+      const unmappedSegs = Object.values(segMap).filter(v => v === '__UNMAPPED__').length;
+      const unmappedColabs = Object.values(colabMap).filter(v => v === '__UNMAPPED__').length;
+      const unmappedTipos = Object.values(tipoMap).filter(v => v === '__UNMAPPED__').length;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-phone').textContent = withPhone;
+      document.getElementById('stat-ramos').textContent = unmappedRamos;
+      document.getElementById('stat-segs').textContent = unmappedSegs;
+
+      document.getElementById('tab-badge-ramos').textContent = unmappedRamos;
+      document.getElementById('tab-badge-segs').textContent = unmappedSegs;
+      document.getElementById('tab-badge-tipos').textContent = unmappedTipos;
+      document.getElementById('tab-badge-colabs').textContent = unmappedColabs;
+      document.getElementById('tab-badge-ramos').className = 'count-badge' + (unmappedRamos > 0 ? ' warn' : '');
+      document.getElementById('tab-badge-segs').className = 'count-badge' + (unmappedSegs > 0 ? ' warn' : '');
+      document.getElementById('tab-badge-tipos').className = 'count-badge' + (unmappedTipos > 0 ? ' warn' : '');
+      document.getElementById('tab-badge-colabs').className = 'count-badge' + (unmappedColabs > 0 ? ' warn' : '');
+
+      const hasUnmapped = unmappedRamos > 0 || unmappedSegs > 0 || unmappedTipos > 0 || unmappedColabs > 0;
+      document.getElementById('mapping-alert').classList.toggle('hidden', !hasUnmapped);
+      document.getElementById('btn-export').disabled = hasUnmapped;
+      document.getElementById('unmapped-note').textContent = hasUnmapped
+        ? '⚠ Resolva os itens em vermelho nas abas acima para habilitar a exportação.'
+        : '';
+    }
+
+    function renderMappingTable(type) {
+      const isColab = type === 'colabs';
+      const isRamo = type === 'ramos';
+      const isTipo = type === 'tipos';
+      const map = getMap(type);
+      const counts = isRamo ? productCounts : (isColab ? colabCounts : (isTipo ? tipoCounts : segCounts));
+      const options = isRamo ? RAMOS_GHL : (isColab ? null : (isTipo ? TIPOS_GHL : SEGS_GHL));
+      const tbody = document.querySelector(`#table-${type} tbody`);
+      const filter = document.getElementById(`search-${type}`).value.toLowerCase();
+
+      const entries = Object.entries(counts)
+        .filter(([k]) => !filter || k.toLowerCase().includes(filter))
+        .sort((a, b) => b[1] - a[1]);
+
+      document.getElementById(`${type}-count-label`).textContent = `${entries.length} de ${Object.keys(counts).length} item(s)`;
+
+      tbody.innerHTML = '';
+      entries.forEach(([original, count]) => {
+        const current = map[original];
+        const isUnmapped = current === '__UNMAPPED__';
+        const tr = document.createElement('tr');
+        const safeKey = original.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+        let inputHtml;
+        if (isColab) {
+          const knownOptions = Object.keys(COLAB_MAP);
+          const selectOpts = `<option value="__UNMAPPED__" ${isUnmapped ? 'selected' : ''}>— selecione —</option>`
+            + knownOptions.map(k => `<option value="${COLAB_MAP[k]}" ${current === COLAB_MAP[k] ? 'selected' : ''}>${k}</option>`).join('');
+          inputHtml = `<div style="display:flex;gap:6px;align-items:center;">
+        <select class="select-map ${isUnmapped ? 'unmapped' : ''}" style="flex:1" onchange="updateMap('colabs','${safeKey}',this)">
+          ${selectOpts}
+        </select>
+        <input type="text" class="search-input ${isUnmapped ? 'unmapped' : ''}" style="width:160px;font-family:monospace;font-size:11px"
+          placeholder="ID GHL manual..."
+          value="${isUnmapped ? '' : current}"
+          oninput="updateMapRaw('colabs','${safeKey}',this)">
+      </div>`;
+        } else {
+          const optionsHtml = `<option value="__UNMAPPED__" ${isUnmapped ? 'selected' : ''}>— selecione —</option>`
+            + options.map(o => `<option value="${o}" ${current === o ? 'selected' : ''}>${o}</option>`).join('');
+          inputHtml = `<select class="select-map ${isUnmapped ? 'unmapped' : ''}" onchange="updateMap('${type}','${safeKey}',this)">${optionsHtml}</select>`;
+        }
+
+        tr.innerHTML = `
+      <td><span class="tag-original">${original}</span></td>
+      <td style="color:var(--text3)">${count}</td>
+      <td>${inputHtml}</td>
+      <td>${isUnmapped
+            ? '<span class="badge-warn">⚠ Não mapeado</span>'
+            : '<span class="badge-ok">✓ Mapeado</span>'}</td>
+    `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateMap(type, original, selectEl) {
+      const map = getMap(type);
+      map[original] = selectEl.value;
+      selectEl.className = 'select-map' + (selectEl.value === '__UNMAPPED__' ? ' unmapped' : '');
+      // Sync text input if colab
+      if (type === 'colabs') {
+        const tr = selectEl.closest('tr');
+        const inp = tr.querySelector('input[type=text]');
+        if (inp) { inp.value = selectEl.value === '__UNMAPPED__' ? '' : selectEl.value; inp.className = 'search-input' + (selectEl.value === '__UNMAPPED__' ? ' unmapped' : ''); }
+      }
+      const tr = selectEl.closest('tr');
+      tr.querySelector('td:last-child').innerHTML = selectEl.value === '__UNMAPPED__'
+        ? '<span class="badge-warn">⚠ Não mapeado</span>'
+        : '<span class="badge-ok">✓ Mapeado</span>';
+      updateStats();
+      renderPreview();
+    }
+
+    function updateMapRaw(type, original, inputEl) {
+      const map = getMap(type);
+      const val = inputEl.value.trim() || '__UNMAPPED__';
+      map[original] = val;
+      inputEl.className = 'search-input' + (val === '__UNMAPPED__' ? ' unmapped' : '');
+      const tr = inputEl.closest('tr');
+      tr.querySelector('td:last-child').innerHTML = val === '__UNMAPPED__'
+        ? '<span class="badge-warn">⚠ Não mapeado</span>'
+        : '<span class="badge-ok">✓ Mapeado</span>';
+      updateStats();
+      renderPreview();
+    }
+
+    function filterTable(type) {
+      renderMappingTable(type);
+    }
+
+    function switchTab(type) {
+      const tabs = ['ramos', 'segs', 'tipos', 'colabs'];
+      document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('active', tabs[i] === type);
+      });
+      tabs.forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('active', t === type);
+      });
+    }
+
+    function buildRow(row) {
+      const c = columns;
+      const cliente = String(row[c.cliente] || '').trim();
+      const cpfcnpj = String(row[c.cpfcnpj] || '').trim();
+
+      const keywords = ['LTDA', 'S/A', ' SA ', ' EIRELI', ' ME ', ' EPP', ' SS ', ' ASSOCIADOS', 'CLINICA', 'CLÍNICA', 'COMERCIO', 'COMÉRCIO', 'INSTITUTO', 'HOSPITAL', 'POLICLINICA', 'CONSULTORIO'];
+      const isEmpresa = keywords.some(k => cliente.toUpperCase().includes(k)) || cpfcnpj.includes('/');
+
+      let firstName = '', lastName = '', businessName = '';
+      if (isEmpresa) {
+        businessName = cliente;
+        // GHL exige First Name no import — usa a primeira palavra do nome da empresa.
+        const first = cliente.split(/\s+/)[0] || '';
+        firstName = first ? first.charAt(0) + first.slice(1).toLowerCase() : '';
+      } else {
+        const parts = cliente.split(/\s+/);
+        firstName = parts[0] ? parts[0].charAt(0) + parts[0].slice(1).toLowerCase() : '';
+        lastName = parts.slice(1).map(p => p.charAt(0) + p.slice(1).toLowerCase()).join(' ');
+      }
+
+      const prodKey = String(row[c.produto] || '').trim().toUpperCase();
+      const segKey = String(row[c.seguradora] || '').trim().toUpperCase();
+      const ramo = ramoMap[prodKey] || prodKey;
+      const seg = segMap[segKey] || segKey;
+      const apolice = String(row[c.apolice] || '').trim();
+      const tipoRaw = String(row[c.tipo] || '').trim().toUpperCase();
+      const tipoNegocio = (tipoMap[tipoRaw] && tipoMap[tipoRaw] !== '__UNMAPPED__')
+        ? tipoMap[tipoRaw]
+        : String(row[c.tipo] || '').trim();
+
+      const iniOrig = fmtDate(row[c.ini]);
+      const fimOrig = fmtDate(row[c.fim]);
+      const iniRenov = addOneYear(iniOrig);
+      const fimRenov = addOneYear(fimOrig);
+
+      return {
+        "First Name": firstName,
+        "Last Name": lastName,
+        "Business Name": businessName,
+        "Phone": fmtPhone(row[c.telefone]),
+        "Email": String(row[c.email] || '').trim(),
+        "Opportunity name": `Renovação - ${ramo} - Apólice ${apolice}`,
+        "Pipeline": "Seguros",
+        "Stage": "Sem contato (renovações)",
+        "Opportunity Value": fmtNum(row[c.premioT]),
+        "Notes": cpfcnpj ? `CPF/CNPJ: ${cpfcnpj}` : (String(row[c.situacao] || '').trim() ? `Situação: ${row[c.situacao]}` : ''),
+        "Tags": tipoNegocio,
+        "numero_da_apolice": apolice,
+        "ramo": ramo,
+        "per_comissao": fmtNum(row[c.porcent]) ? String(parseFloat(fmtNum(row[c.porcent])) / 100) : '',
+        "pb": fmtNum(row[c.premioT]),
+        "pl": fmtNum(row[c.premioL]),
+        "comissao": (() => { const pl = parseFloat(fmtNum(row[c.premioL]) || 0); const pc = parseFloat(fmtNum(row[c.porcent]) || 0); return (pl && pc) ? String(pl * pc / 100) : fmtNum(row[c.comissao]); })(),
+        "inivigencia_antes": fmtDateBr(iniOrig),
+        "inivigencia_depois": fmtDateBr(iniRenov),
+        "fimvigencia_antes": fmtDateBr(fimOrig),
+        "fimvigencia_depois": fmtDateBr(fimRenov),
+        "inivigencia": iniRenov,
+        "fimvigencia": fimRenov,
+        "tiponegoico": tipoNegocio,
+        "tipodocumento": "Apólice",
+        "grpproducao": String(row[c.grupoProd] || '').trim().replace(/\//g, '|'),
+        "Opportunity Owner": (() => {
+          const nome = String(row[c.colaborador] || '').trim().toUpperCase();
+          const mapped = colabMap[nome];
+          return (mapped && mapped !== '__UNMAPPED__') ? mapped : '';
+        })(),
+        "formapag": String(row[c.formapag] || '').trim(),
+        "parcelas": String(row[c.parcelas] || '').trim(),
+        "sinistros": fmtNum(row[c.sinistro]),
+        "seguradora": seg,
+      };
+    }
+
+    function renderPreview() {
+      const PREVIEW_COLS = [
+        { key: "First Name", label: "First Name" },
+        { key: "Last Name", label: "Last Name" },
+        { key: "Business Name", label: "Business Name" },
+        { key: "Phone", label: "Phone" },
+        { key: "Opportunity name", label: "Opportunity name" },
+        { key: "ramo", label: "ramo" },
+        { key: "seguradora", label: "seguradora" },
+        { key: "tiponegoico", label: "tiponegoico" },
+        { key: "tipodocumento", label: "tipodocumento" },
+        { key: "grpproducao", label: "grpproducao" },
+        { key: "inivigencia_antes", label: "Início vig. (era)", cls: "vig-antes" },
+        { key: "inivigencia_depois", label: "Início vig. (ficou)", cls: "vig-depois" },
+        { key: "fimvigencia_antes", label: "Fim vig. (era)", cls: "vig-antes" },
+        { key: "fimvigencia_depois", label: "Fim vig. (ficou)", cls: "vig-depois" },
+        { key: "pb", label: "pb" },
+      ];
+      const sample = rawData.slice(0, 10).map(buildRow);
+
+      const thead = document.querySelector('#preview-table thead');
+      const tbody = document.querySelector('#preview-table tbody');
+      thead.innerHTML = '<tr>' + PREVIEW_COLS.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
+      tbody.innerHTML = sample.map(r =>
+        '<tr>' + PREVIEW_COLS.map(c => {
+          const val = r[c.key] || '';
+          const tdCls = c.cls ? ` class="${c.cls}"` : '';
+          return `<td${tdCls} title="${val}">${val}</td>`;
+        }).join('') + '</tr>'
+      ).join('');
+      document.getElementById('preview-count').textContent = `${rawData.length} linhas`;
+    }
+
+    function exportCSV() {
+      const fieldnames = [
+        "First Name", "Last Name", "Business Name", "Phone", "Email",
+        "Opportunity name", "Pipeline", "Stage", "Opportunity Value", "Opportunity Owner",
+        "Notes", "Tags",
+        "numero_da_apolice", "ramo", "per_comissao", "pb", "pl", "comissao",
+        "inivigencia", "fimvigencia", "tiponegoico", "tipodocumento", "grpproducao",
+        "formapag", "parcelas", "sinistros", "seguradora"
+      ];
+
+      const rows = rawData.map(buildRow);
+      const escape = v => {
+        const s = String(v);
+        return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = fieldnames.join(',');
+      const body = rows.map(r => fieldnames.map(f => escape(r[f] !== undefined && r[f] !== null ? r[f] : '')).join(',')).join('\r\n');
+      const csv = '\uFEFF' + header + '\r\n' + body; // BOM for Excel
+
+      const bytes = new TextEncoder().encode(csv);
+      let binary = '';
+      bytes.forEach(b => binary += String.fromCharCode(b));
+      const b64 = btoa(binary);
+      const a = document.createElement('a');
+      a.href = 'data:text/csv;base64,' + b64;
+      a.download = `importacao_ghl_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      updateSteps(4);
+    }
+
+    function resetApp() {
+      rawData = [];
+      document.getElementById('section-main').classList.add('hidden');
+      document.getElementById('section-upload').classList.remove('hidden');
+      document.getElementById('file-input').value = '';
+      updateSteps(1);
+    }
+
+    function updateSteps(active) {
+      [1, 2, 3, 4].forEach(n => {
+        const el = document.getElementById(`step${n}`);
+        el.className = 'step' + (n < active ? ' done' : n === active ? ' active' : '');
+      });
+      if (active >= 3) document.getElementById('step3').className = 'step done';
+      if (active >= 4) document.getElementById('step4').className = 'step done';
+    }
+  </script>
+</body>
+
+</html>
