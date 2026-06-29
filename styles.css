@@ -9,6 +9,7 @@
   --bg-raised: #131928;
   --bg-elevated: #1a2236;
   --bg-input: #0f1520;
+  --header-bg: rgba(11, 15, 24, 0.88);
 
   /* Borders */
   --border-subtle: rgba(255, 255, 255, 0.065);
@@ -320,7 +321,7 @@ body {
 }
 
 header {
-  background: rgba(11, 15, 24, 0.88);
+  background: var(--header-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-subtle);
@@ -381,7 +382,7 @@ header p {
 /* ── Nav tabs ── */
 .nav-tabs {
   display: flex;
-  background: rgba(11, 15, 24, 0.88);
+  background: var(--header-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-subtle);
@@ -1766,6 +1767,7 @@ input[type=date]:focus {
     --bg-raised: #ffffff;
     --bg-elevated: #f8f9fa;
     --bg-input: #e4e7eb;
+    --header-bg: rgba(255, 255, 255, 0.85);
     --border-subtle: rgba(0, 0, 0, 0.08);
     --border-default: rgba(0, 0, 0, 0.12);
     --border-focus: #4E80FF;
