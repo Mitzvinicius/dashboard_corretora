@@ -1,16 +1,18 @@
 <!DOCTYPE html>
-<!--
-  ⚠️ ARQUIVO OBSOLETO — NÃO EDITAR.
-  O HTML canônico/atual do dashboard é o `dashboard.html`.
-  Este `index.html` é uma cópia desatualizada, mantida apenas por compatibilidade.
-  Qualquer alteração de marcação deve ser feita em `dashboard.html`.
--->
 <html lang="pt-BR">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard de Produção</title>
+  <script>
+    // Azure AD não aceita 127.0.0.1 como redirect URI — só localhost.
+    // Live Server abre em 127.0.0.1 por padrão; forçamos localhost para que
+    // o popup MSAL e a página principal estejam na mesma origem.
+    if (window.location.hostname === '127.0.0.1') {
+      window.location.replace(window.location.href.replace('127.0.0.1', 'localhost'));
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -264,9 +266,9 @@
             <button class="btn-sm" style="font-size:10px;padding:2px 6px;margin-right:8px"
               onclick="exportData('producao')">Exportar</button>
             <div class="metric-toggle">
-              <input type="radio" name="mt-tbl" id="mt-tbl-p" value="premio" checked onchange="renderProdTable()">
+              <input type="radio" name="mt-tbl" id="mt-tbl-p" value="premio" onchange="renderProdTable()">
               <label for="mt-tbl-p">Prêmio</label>
-              <input type="radio" name="mt-tbl" id="mt-tbl-c" value="comissao" onchange="renderProdTable()">
+              <input type="radio" name="mt-tbl" id="mt-tbl-c" value="comissao" checked onchange="renderProdTable()">
               <label for="mt-tbl-c">Comissão</label>
             </div>
             <button class="collapse-btn" id="cb-table">−</button>
@@ -728,6 +730,7 @@
 
   </div><!-- /dash -->
 
+  <script src="https://unpkg.com/@azure/msal-browser@2.39.0/lib/msal-browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="main.js"></script>

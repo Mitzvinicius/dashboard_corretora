@@ -12,7 +12,7 @@ O projeto tem duas camadas independentes, **ambas funcionando**:
 | Camada | Arquivo | Papel |
 |--------|---------|-------|
 | Sync server-side | `scripts/sync_producao.py` | Puxa os Excel de e-mails e os sobe para o SharePoint |
-| Dashboard browser-side | `index.html` / `dashboard.html` + `main.js` | Autentica via MSAL no Azure AD, baixa os Excel do SharePoint (Graph API), parseia e renderiza |
+| Dashboard browser-side | `index.html` + `main.js` | Autentica via MSAL no Azure AD, baixa os Excel do SharePoint (Graph API), parseia e renderiza |
 
 O fluxo é: **Python sync (e-mail → SharePoint)** → **browser (MSAL → Graph API → render)**.
 
@@ -24,8 +24,7 @@ O fluxo é: **Python sync (e-mail → SharePoint)** → **browser (MSAL → Grap
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `dashboard.html` | HTML **canônico/atual** do dashboard. É aqui que mudanças de marcação devem ser feitas. |
-| `index.html` | ⚠️ **Obsoleto** — cópia desatualizada, mantida só por compatibilidade. Não editar. |
+| `index.html` | HTML **único/canônico** do dashboard (era `dashboard.html`; renomeado em 2026 ao remover a cópia obsoleta). É aqui que mudanças de marcação devem ser feitas. |
 | `main.js` | Toda a lógica do dashboard (~2.8k linhas), organizada por seções. |
 | `styles.css` | Estilos (~2.5k linhas). |
 | `auth.html` | Página de redirect do OAuth (recebe o retorno do login MSAL). |

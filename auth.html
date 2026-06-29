@@ -18,12 +18,12 @@
     // Em popup (window.opener existe): MSAL na janela pai lê esta URL e fecha o popup.
     //   → não fazemos nada, deixamos a MSAL processar.
     // Em redirect (window.opener nulo): a navegação principal voltou aqui;
-    //   redirecionamos para dashboard.html preservando o ?code=... para a MSAL processar lá.
+    //   redirecionamos para index.html preservando o ?code=... para a MSAL processar lá.
     (function () {
       var inPopup = !!(window.opener && window.opener !== window);
       if (inPopup) return;
       var q = window.location.search;
-      var path = window.location.pathname.replace(/auth\.html$/i, 'dashboard.html');
+      var path = window.location.pathname.replace(/auth\.html$/i, 'index.html');
       window.location.replace(window.location.origin + path + q);
     })();
   </script>

@@ -166,8 +166,8 @@ class DashHandler(BaseHTTPRequestHandler):
             return
 
         # Arquivos estáticos
-        if path in ("/", "/index.html"):
-            path = "/dashboard.html"
+        if path == "/":
+            path = "/index.html"
 
         filepath = BASE_DIR / path.lstrip("/")
         if filepath.is_file():
@@ -195,7 +195,7 @@ def main() -> None:
         sys.exit(1)
 
     server = HTTPServer(("localhost", PORT), DashHandler)
-    url = f"http://localhost:{PORT}/dashboard.html"
+    url = f"http://localhost:{PORT}/index.html"
 
     print(f"\n→ Dashboard disponível em {url}")
     print("→ Pressione Ctrl+C para encerrar\n")

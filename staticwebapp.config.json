@@ -1,9 +1,0 @@
-{
-  "routes": [
-    { "route": "/", "rewrite": "/dashboard.html" }
-  ],
-  "navigationFallback": {
-    "rewrite": "/dashboard.html",
-    "exclude": ["/*.{js,css,png,jpg,jpeg,gif,svg,ico,html,xlsx}"]
-  }
-}
