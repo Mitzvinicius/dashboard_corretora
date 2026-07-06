@@ -4,9 +4,15 @@ let compStartDate = '', compEndDate = '', compMetric = 'premio_novo';
 let CLAIMS = [], FD_CLAIMS = [];
 let claimsSourceCounts = { sinistrosAvisados: 0, sinistrosPagamentos: 0 };
 let sinistralView = 'seg', rentabilView = 'seg';
-const PROD_TABS = ['visao-geral', 'producao', 'retencao', 'comparativo', 'metas'];
+const PROD_TABS = ['visao-geral', 'producao', 'retencao', 'comparativo', 'metas', 'crosssell'];
 let activeTipos = new Set();
 const MS = { col: new Set(), grp: new Set(), ram: new Set(), seg: new Set() };
+// Cross-sell state
+const CROSS = { pessoa: 'PF', col: new Set(), ram: new Set() };
+let crossSearch = '';
+let crossSortKey = 'ltv', crossSortDir = 'desc';
+let crossPage = 1;
+const CROSS_PAGE_SIZE = 50;
 let activeCancelMotivos = null;
 const charts = {};
 let sortKey = 'premio', sortDir = 'desc';
@@ -17,7 +23,7 @@ const RET_MS = { col: new Set(), ram: new Set(), grp: new Set(), mot: new Set() 
 let retActiveTipos = new Set();
 let retDetailFilter = '';
 let retSortKey = 'pctQtd', retSortDir = 'desc';
-const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'comp-chart': true, 'comp-kpis': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
+const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
 let metaSortKey = 'totalAnt', metaSortDir = 'desc';
 let metaWeekTeam = 'geral';    // geral | pessoais | patrimoniais
 let metaWeekMetric = 'premio'; // premio | comissao
@@ -49,7 +55,8 @@ const COL = {
   tipo: 'TIPO DE NEGÓCIO', vig: 'INÍCIO DE VIGÊNCIA', em: 'DATA EMISSÃO',
   fim: 'TÉRMINO DE VIGÊNCIA', cli: 'CLIENTE', seg: 'SEGURADORA',
   ramo: 'RAMO', grp: 'GRUPO DE PRODUÇÃO', premio: 'PRÊMIO', com: 'COMISSÃO',
-  colab: 'COLABORADOR', sit: 'SITUAÇÃO', motivo: 'MOTIVO CANCELAMENTO', cancel: 'DATA CANCELAMENTO'
+  colab: 'COLABORADOR', sit: 'SITUAÇÃO', motivo: 'MOTIVO CANCELAMENTO', cancel: 'DATA CANCELAMENTO',
+  doc: 'CPF/CNPJ', pessoa: 'TIPO PESSOA', tipoDoc: 'TIPO DOCUMENTO'
 };
 const TIPO_LABELS = { R: 'R — Renovação', N: 'N — Negócio novo', ER: 'ER — Endosso renov.', EN: 'EN — Endosso novo', CR: 'CR — Cancel. renov.', CN: 'CN — Cancel. novo' };
 const PALETA = ['#378ADD', '#639922', '#E24B4A', '#BA7517', '#534AB7', '#1D9E75', '#D4537E', '#888780', '#5DCAA5', '#F09595', '#97C459', '#BC8CFF'];
@@ -155,6 +162,7 @@ function showTab(id, btn) {
   if (id === 'retencao') renderRetTab();
   if (id === 'comparativo') renderCompTab();
   if (id === 'metas') renderMetasTab();
+  if (id === 'crosssell') renderCrossTab();
   if (id === 'sinistros') renderSinistrosTab();
 }
 
@@ -241,7 +249,8 @@ function updateMsTriggerGeneric(wrap, msObj, key, placeholder) {
   }
 }
 function triggerFilter(cid) {
-  if (cid && (cid.startsWith('ms-ret'))) renderRetTab();
+  if (cid && cid.startsWith('ms-ret')) renderRetTab();
+  else if (cid && cid.startsWith('ms-cross')) { crossPage = 1; renderCrossTab(); }
   else applyFilters();
 }
 function closeAllDropdowns() {
@@ -292,14 +301,31 @@ function toggleCancelFilter() {
 function parseProducaoArrayBuffer(buf) {
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-  return rows.map(r => ({
-    tipo: String(r[COL.tipo] || '').trim(), vig: toDate(r[COL.vig]), em: toDate(r[COL.em]),
-    fim: toDate(r[COL.fim]), cli: String(r[COL.cli] || ''), seg: String(r[COL.seg] || ''),
-    ramo: String(r[COL.ramo] || ''), grp: String(r[COL.grp] || ''),
-    premio: parseFloat(r[COL.premio]) || 0, com: parseFloat(r[COL.com]) || 0,
-    colab: String(r[COL.colab] || ''), sit: String(r[COL.sit] || ''),
-    motivo: String(r[COL.motivo] || ''), cancel: toDate(r[COL.cancel])
-  }));
+  return rows.map(r => {
+    const docDigits = String(r[COL.doc] || '').replace(/\D/g, '');
+    const pessoaTxt = normRamo(r[COL.pessoa]);
+    // Fallback pelo tamanho do documento: o CNPJ nesta base vem com máscara de 15 dígitos
+    // (ex: 032.259.341/0001-72), não os 14 padrão — por isso ">11" em vez de "===14".
+    const tipoPessoa = pessoaTxt.startsWith('JUR') ? 'PJ' : pessoaTxt.startsWith('FIS') ? 'PF'
+      : docDigits.length === 11 ? 'PF' : docDigits.length > 11 ? 'PJ' : '';
+    return {
+      tipo: String(r[COL.tipo] || '').trim(), vig: toDate(r[COL.vig]), em: toDate(r[COL.em]),
+      fim: toDate(r[COL.fim]), cli: String(r[COL.cli] || ''), seg: String(r[COL.seg] || ''),
+      ramo: String(r[COL.ramo] || ''), grp: String(r[COL.grp] || ''),
+      premio: parseFloat(r[COL.premio]) || 0, com: parseFloat(r[COL.com]) || 0,
+      colab: String(r[COL.colab] || ''), sit: String(r[COL.sit] || ''),
+      motivo: String(r[COL.motivo] || ''), cancel: toDate(r[COL.cancel]),
+      docDigits, tipoPessoa, tipoDoc: String(r[COL.tipoDoc] || '').trim()
+    };
+  });
+}
+
+// ── Formatação de documento (CPF/CNPJ) ─────────────────────────────────────────
+function formatDoc(digits, tipoPessoa) {
+  if (!digits) return '—';
+  if (tipoPessoa === 'PF' && digits.length === 11) return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  if (tipoPessoa === 'PJ' && digits.length === 14) return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  return digits;
 }
 
 function claimDedupeKey(r) {
@@ -392,6 +418,7 @@ function initDashboard(opts) {
       Object.keys(MS).forEach(k => MS[k].clear());
       activeCancelMotivos = null;
       periods = [];
+      CROSS.pessoa = 'PF'; CROSS.col.clear(); CROSS.ram.clear(); crossSearch = '';
     }
     populateFilters();
     buildTipoBtns();
@@ -654,6 +681,7 @@ function populateFilters() {
   buildMultiSelect('ms-ret-ram', RET_MS, 'ram', uniq('ramo'), 'Todos');
   buildMultiSelect('ms-ret-grp', RET_MS, 'grp', uniq('grp'), 'Todos');
   buildMultiSelect('ms-ret-mot', RET_MS, 'mot', [...new Set(ALL.filter(r => r.sit === 'Cancelada').map(r => r.motivo || 'Não informado').filter(Boolean))].sort(), 'Todos');
+  buildCrossFilters();
   ['f-vig-s', 'f-vig-e', 'f-em-s', 'f-em-e'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
   ['ret-vig-s', 'ret-vig-e', 'ret-can-s', 'ret-can-e'].forEach(id => document.getElementById(id).addEventListener('change', renderRetTab));
 }
@@ -1339,6 +1367,213 @@ function renderRetDetailTable() {
 }
 
 // ── Exportação ────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// ── CROSS-SELL ────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+function buildCrossFilters() {
+  const ramoOptions = getCrossRamoUniverse(CROSS.pessoa);
+  buildMultiSelect('ms-cross-ram', CROSS, 'ram', ramoOptions, 'Todos');
+  const colabOptions = [...new Set(ALL.filter(r => r.docDigits && r.tipoPessoa === CROSS.pessoa).map(r => r.colab).filter(Boolean))].sort();
+  buildMultiSelect('ms-cross-col', CROSS, 'col', colabOptions, 'Todos');
+}
+
+function getCrossRamoUniverse(pessoa) {
+  return [...new Set(ALL.filter(r => r.docDigits && r.tipoPessoa === pessoa && r.sit === 'Ativa' && r.ramo).map(r => r.ramo))].sort();
+}
+
+function getCrossRamoList() {
+  const universe = getCrossRamoUniverse(CROSS.pessoa);
+  return CROSS.ram.size > 0 ? universe.filter(r => CROSS.ram.has(r)) : universe;
+}
+
+// Agrupa apólices por CPF/CNPJ. LTV = comissão líquida total (já contempla estornos
+// CR/CN, que chegam com valor negativo) / anos desde a 1ª vigência histórica do cliente.
+function buildCrossMap(pessoa) {
+  const map = new Map();
+  ALL.forEach(r => {
+    if (!r.docDigits || r.tipoPessoa !== pessoa) return;
+    let c = map.get(r.docDigits);
+    if (!c) {
+      c = { doc: r.docDigits, tipoPessoa: pessoa, nome: r.cli, ramosAtivos: new Set(), apolicesAtivas: 0, comissaoTotal: 0, primeiraVig: null, colabs: new Set() };
+      map.set(r.docDigits, c);
+    }
+    if (r.cli) c.nome = r.cli;
+    c.comissaoTotal += r.com;
+    if (r.colab) c.colabs.add(r.colab);
+    if (r.sit === 'Ativa') {
+      if (r.tipoDoc === 'APÓLICE') c.apolicesAtivas++; // exclui endossos/faturas, que são alterações da apólice, não novos contratos
+      if (r.ramo) c.ramosAtivos.add(r.ramo);
+    }
+    if (r.vig && (!c.primeiraVig || r.vig < c.primeiraVig)) c.primeiraVig = r.vig;
+  });
+  return map;
+}
+
+function getCrossClients() {
+  let clients = [...buildCrossMap(CROSS.pessoa).values()];
+  if (CROSS.col.size > 0) clients = clients.filter(c => [...c.colabs].some(cl => CROSS.col.has(cl)));
+  if (crossSearch) {
+    const s = crossSearch.toLowerCase().trim();
+    const sDigits = s.replace(/\D/g, '');
+    clients = clients.filter(c => c.nome.toLowerCase().includes(s) || (sDigits && c.doc.includes(sDigits)));
+  }
+  clients.forEach(c => {
+    const anos = c.primeiraVig ? (Date.now() - c.primeiraVig.getTime()) / (365.25 * 86400000) : 0;
+    c.anos = anos;
+    c.ltv = anos > 1 ? c.comissaoTotal / anos : null;
+  });
+  return clients;
+}
+
+function setCrossPessoa(p) {
+  CROSS.pessoa = p;
+  CROSS.ram.clear(); CROSS.col.clear();
+  crossPage = 1;
+  buildCrossFilters();
+  renderCrossTab();
+}
+
+function setCrossPage(page) { crossPage = page; renderCrossTable(getCrossClients(), getCrossRamoList()); }
+
+function onCrossSearch(v) { crossSearch = v; crossPage = 1; renderCrossTable(getCrossClients(), getCrossRamoList()); }
+
+function resetCrossFilters() {
+  CROSS.ram.clear(); CROSS.col.clear();
+  const s = document.getElementById('cross-search'); if (s) s.value = '';
+  crossSearch = ''; crossPage = 1;
+  [...document.querySelectorAll('.ms-wrap')].forEach(w => { if (w._msObj === CROSS && w._key) { renderMsListGeneric(w._list, w._vals, CROSS, w._key); updateMsTriggerGeneric(w, CROSS, w._key, w._placeholder); } });
+  renderCrossTab();
+}
+
+function setCrossSort(key) {
+  if (crossSortKey === key) crossSortDir = crossSortDir === 'desc' ? 'asc' : 'desc'; else { crossSortKey = key; crossSortDir = key === 'nome' ? 'asc' : 'desc'; }
+  renderCrossTable(getCrossClients(), getCrossRamoList());
+}
+
+function renderCrossTab() {
+  const clients = getCrossClients();
+  const ramoList = getCrossRamoList();
+  renderCrossKPIs(clients, ramoList);
+  renderCrossPenetracao(clients, ramoList);
+  renderCrossTable(clients, ramoList);
+}
+
+function renderCrossKPIs(clients, ramoList) {
+  const totalDocsAll = new Set(ALL.filter(r => r.docDigits).map(r => r.docDigits)).size;
+  const comissaoTotal = clients.reduce((s, c) => s + c.comissaoTotal, 0);
+  const withLtv = clients.filter(c => c.ltv != null);
+  const ltvMedio = withLtv.length ? withLtv.reduce((s, c) => s + c.ltv, 0) / withLtv.length : 0;
+
+  let maisPopular = { ramo: '—', pct: 0 }, maiorOportunidade = { ramo: '—', pct: 1 };
+  if (clients.length && ramoList.length) {
+    ramoList.forEach(ramo => {
+      const pct = clients.filter(c => c.ramosAtivos.has(ramo)).length / clients.length;
+      if (pct > maisPopular.pct) maisPopular = { ramo, pct };
+      if (pct < maiorOportunidade.pct) maiorOportunidade = { ramo, pct };
+    });
+  }
+
+  document.getElementById('cross-kpi-grid').innerHTML = [
+    { l: 'Total de clientes', v: fN(clients.length), s: fN(totalDocsAll) + ' no total (PF+PJ)', c: 'k-teal' },
+    { l: 'Comissão total (LTV)', v: fBRL(comissaoTotal), s: fN(ramoList.length) + ' ramos mapeados', c: 'k-green' },
+    { l: 'LTV médio por cliente', v: fBRL(ltvMedio), s: fN(withLtv.length) + ' c/ histórico >1 ano', c: 'k-purple' },
+    { l: 'Ramo mais popular', v: maisPopular.ramo, s: fP(maisPopular.pct) + ' dos clientes', c: 'k-blue' },
+    { l: 'Maior oportunidade', v: maiorOportunidade.ramo, s: fP(maiorOportunidade.pct) + ' possuem', c: 'k-red' },
+  ].map(k => `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+}
+
+function renderCrossPenetracao(clients, ramoList) {
+  const total = clients.length;
+  const wrap = document.getElementById('cross-pen-wrap');
+  if (!ramoList.length || !total) {
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px">Nenhum dado para o filtro atual.</div>';
+    return;
+  }
+  const rows = ramoList.map(ramo => {
+    const has = clients.filter(c => c.ramosAtivos.has(ramo)).length;
+    const pctHas = has / total;
+    return { ramo, has, not: total - has, pctHas };
+  }).sort((a, b) => b.pctHas - a.pctHas);
+
+  wrap.innerHTML = rows.map(r => `
+    <div class="pen-row">
+      <div class="pen-label" title="${r.ramo}">${r.ramo}</div>
+      <div class="pen-bar">
+        <div class="pen-seg-yes" style="width:${(r.pctHas * 100).toFixed(2)}%"><span>✅ ${fN(r.has)} (${fP(r.pctHas)})</span></div>
+        <div class="pen-seg-no"><span>❌ ${fN(r.not)} (${fP(1 - r.pctHas)})</span></div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCrossTable(clients, ramoList) {
+  let rows = [...clients];
+  rows.sort((a, b) => {
+    let va, vb;
+    if (crossSortKey === 'ltv') { va = a.ltv ?? -Infinity; vb = b.ltv ?? -Infinity; }
+    else if (crossSortKey === 'nome') { va = a.nome; vb = b.nome; }
+    else { va = a[crossSortKey]; vb = b[crossSortKey]; }
+    if (typeof va === 'string') return crossSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    return crossSortDir === 'asc' ? va - vb : vb - va;
+  });
+
+  const thCls = k => k === crossSortKey ? (crossSortDir === 'asc' ? 'sort-asc' : 'sort-desc') : '';
+  const th = (k, lbl, align = 'left') => `<th class="ret-sortable ${thCls(k)}" style="text-align:${align}" onclick="setCrossSort('${k}')">${lbl}<span class="sort-icon"></span></th>`;
+  const ramoTh = ramoList.map(r => `<th style="text-align:center" title="${r}">${r}</th>`).join('');
+
+  const totalRows = rows.length;
+  const { pageRows, totalPages, start } = paginateCrossRows(rows);
+  renderCrossPagination(totalRows, totalPages, start, pageRows.length);
+
+  const tbody = pageRows.map(c => {
+    const ramoTds = ramoList.map(r => c.ramosAtivos.has(r)
+      ? '<td style="text-align:center;color:var(--pos-text)">✅</td>'
+      : '<td style="text-align:center;color:var(--text-tertiary)">—</td>').join('');
+    return `<tr>
+      <td class="name-cell" title="${c.nome}">${c.nome}</td>
+      <td class="num" style="font-family:var(--font-mono)">${formatDoc(c.doc, c.tipoPessoa)}</td>
+      ${ramoTds}
+      <td class="num">${fN(c.apolicesAtivas)}</td>
+      <td class="num">${c.ltv == null ? '—' : fBRL(c.ltv)}</td>
+    </tr>`;
+  }).join('');
+
+  const badge = document.getElementById('cross-table-badge');
+  if (badge) badge.textContent = fN(rows.length) + ' clientes';
+
+  document.getElementById('cross-table-wrap').innerHTML = `
+    <table class="ret-table">
+      <thead><tr>
+        ${th('nome', 'Nome')}
+        <th>CPF/CNPJ</th>
+        ${ramoTh}
+        ${th('apolicesAtivas', 'Apólices ativas', 'right')}
+        ${th('ltv', 'LTV', 'right')}
+      </tr></thead>
+      <tbody>${tbody || `<tr><td colspan="${3 + ramoList.length}" style="text-align:center;color:var(--text-tertiary)">Nenhum cliente encontrado</td></tr>`}</tbody>
+    </table>`;
+}
+
+function paginateCrossRows(rows) {
+  const totalPages = Math.max(1, Math.ceil(rows.length / CROSS_PAGE_SIZE));
+  if (crossPage > totalPages) crossPage = totalPages;
+  if (crossPage < 1) crossPage = 1;
+  const start = (crossPage - 1) * CROSS_PAGE_SIZE;
+  return { pageRows: rows.slice(start, start + CROSS_PAGE_SIZE), totalPages, start };
+}
+
+function renderCrossPagination(total, totalPages, start, pageCount) {
+  const el = document.getElementById('cross-table-pagination');
+  if (!el) return;
+  if (total === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <span style="font-size:11px;color:var(--text-secondary)">${fN(start + 1)}–${fN(start + pageCount)} de ${fN(total)}</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="btn-sm" style="font-size:11px;padding:3px 9px" ${crossPage <= 1 ? 'disabled' : ''} onclick="setCrossPage(${crossPage - 1})">&larr; Anterior</button>
+      <span style="font-size:11px;color:var(--text-secondary)">Página ${crossPage} de ${totalPages}</span>
+      <button class="btn-sm" style="font-size:11px;padding:3px 9px" ${crossPage >= totalPages ? 'disabled' : ''} onclick="setCrossPage(${crossPage + 1})">Próxima &rarr;</button>
+    </div>`;
+}
+
 function exportData(type) {
   if (type === 'producao') {
     const data = buildProdData(FD).map(r => ({
@@ -1405,6 +1640,20 @@ function exportData(type) {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Detalhe");
     XLSX.writeFile(workbook, "Export_Detalhe.xlsx");
+  } else if (type === 'crosssell') {
+    const clients = getCrossClients();
+    const ramoList = getCrossRamoList();
+    const rows = clients.map(c => {
+      const row = { 'Nome': c.nome, 'CPF/CNPJ': formatDoc(c.doc, c.tipoPessoa) };
+      ramoList.forEach(r => { row[r] = c.ramosAtivos.has(r) ? 'Sim' : 'Não'; });
+      row['Apólices ativas'] = c.apolicesAtivas;
+      row['LTV'] = c.ltv == null ? '' : c.ltv;
+      return row;
+    });
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "CrossSell");
+    XLSX.writeFile(workbook, "Export_CrossSell.xlsx");
   }
 }
 

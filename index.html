@@ -86,6 +86,7 @@
       <button class="tab-btn active" onclick="showTab('visao-geral',this)">Visão geral</button>
       <button class="tab-btn" onclick="showTab('producao',this)">Produção</button>
       <button class="tab-btn" onclick="showTab('retencao',this)">Retenção &amp; Churn</button>
+      <button class="tab-btn" onclick="showTab('crosssell',this)">Cross-sell</button>
       <button class="tab-btn" onclick="showTab('comparativo',this)">Comparativo</button>
       <button class="tab-btn" onclick="showTab('metas',this)">Metas</button>
       <button class="tab-btn" onclick="showTab('sinistros',this)">Sinistros</button>
@@ -449,6 +450,68 @@
       </div>
 
     </div><!-- /tab-retencao -->
+
+    <!-- TAB CROSS-SELL -->
+    <div class="tab-pane" id="tab-crosssell">
+
+      <!-- Filtro próprio da aba -->
+      <div class="ret-filter-card">
+        <div style="font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.5px;width:100%">
+          Filtros desta aba</div>
+        <div class="f-group">
+          <span class="f-label">Tipo de pessoa</span>
+          <div class="view-toggle">
+            <input type="radio" name="cross-pessoa" id="cp-pf" value="PF" checked onchange="setCrossPessoa('PF')">
+            <label for="cp-pf">Pessoa física (CPF)</label>
+            <input type="radio" name="cross-pessoa" id="cp-pj" value="PJ" onchange="setCrossPessoa('PJ')">
+            <label for="cp-pj">Pessoa jurídica (CNPJ)</label>
+          </div>
+        </div>
+        <div class="f-group">
+          <span class="f-label">Ramo</span>
+          <div class="ms-wrap" id="ms-cross-ram"></div>
+        </div>
+        <div class="f-group">
+          <span class="f-label">Colaborador</span>
+          <div class="ms-wrap" id="ms-cross-col"></div>
+        </div>
+        <div class="f-group" style="margin-left:auto;justify-content:flex-end">
+          <button class="btn-sm" onclick="resetCrossFilters()">&#8635; Limpar</button>
+        </div>
+      </div>
+
+      <!-- KPIs cross-sell -->
+      <div class="kpi-grid" id="cross-kpi-grid"></div>
+
+      <!-- Gráfico de penetração por ramo -->
+      <div class="chart-card" style="margin-bottom:14px">
+        <div class="chart-top">
+          <span class="chart-title">Penetração por ramo</span>
+        </div>
+        <div id="cross-pen-wrap"></div>
+      </div>
+
+      <!-- Tabela de clientes -->
+      <div class="section-card" id="sc-cross-table">
+        <div class="section-header open" onclick="toggleSection('cross-table')">
+          <span class="section-title">Clientes <span class="section-title-badge" id="cross-table-badge"></span></span>
+          <div class="section-controls" onclick="event.stopPropagation()">
+            <input type="text" id="cross-search" placeholder="Buscar por nome ou CPF/CNPJ..."
+              oninput="onCrossSearch(this.value)"
+              style="padding:5px 10px;background:var(--bg-input);border:1px solid var(--border-default);border-radius:6px;color:var(--text-primary);font-size:11px;min-width:220px">
+            <button class="btn-sm" style="font-size:10px;padding:2px 6px" onclick="exportData('crosssell')">Exportar</button>
+            <button class="collapse-btn" id="cb-cross-table">−</button>
+          </div>
+        </div>
+        <div class="section-body" id="sb-cross-table">
+          <div class="ret-table-wrap" id="cross-table-wrap"></div>
+          <div id="cross-table-pagination"
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--border-subtle)">
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-crosssell -->
 
     <!-- TAB COMPARATIVO DE PERÍODOS -->
     <div class="tab-pane" id="tab-comparativo">
