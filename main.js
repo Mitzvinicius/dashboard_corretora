@@ -1370,8 +1370,21 @@ function renderRetDetailTable() {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── CROSS-SELL ────────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
+// Ramos principais da corretora, pré-ativados por padrão no filtro de ramo do
+// Cross-sell (match por trecho normalizado, mesmo critério de classifyRamo).
+// Demais ramos ficam disponíveis no filtro para o usuário ativar manualmente.
+const CROSS_MAIN_RAMOS = {
+  PF: ['VIDA INDIVIDUAL', 'RC PROFISSIONAL', 'AUTOMOVEL', 'RESIDENCIAL'],
+  PJ: ['SAUDE', 'VIDA EM GRUPO', 'EMPRESARIAL', 'RC PROFISSIONAL'],
+};
+function isCrossMainRamo(ramo, pessoa) {
+  const n = normRamo(ramo);
+  return CROSS_MAIN_RAMOS[pessoa].some(k => n.includes(k));
+}
+
 function buildCrossFilters() {
   const ramoOptions = getCrossRamoUniverse(CROSS.pessoa);
+  if (CROSS.ram.size === 0) ramoOptions.filter(r => isCrossMainRamo(r, CROSS.pessoa)).forEach(r => CROSS.ram.add(r));
   buildMultiSelect('ms-cross-ram', CROSS, 'ram', ramoOptions, 'Todos');
   const colabOptions = [...new Set(ALL.filter(r => r.docDigits && r.tipoPessoa === CROSS.pessoa).map(r => r.colab).filter(Boolean))].sort();
   buildMultiSelect('ms-cross-col', CROSS, 'col', colabOptions, 'Todos');
@@ -1455,7 +1468,45 @@ function renderCrossTab() {
   const ramoList = getCrossRamoList();
   renderCrossKPIs(clients, ramoList);
   renderCrossPenetracao(clients, ramoList);
+  renderCrossNivel(clients);
   renderCrossTable(clients, ramoList);
+}
+
+// Nível de relacionamento por quantidade de apólices ativas do cliente.
+const CROSS_NIVEIS = [
+  { label: 'Nível 1 — Essencial' },
+  { label: 'Nível 2 — Ampliada' },
+  { label: 'Nível 3 — Plena' },
+  { label: 'Nível 4 — Master' },
+];
+function renderCrossNivel(clients) {
+  const counts = [0, 0, 0, 0];
+  clients.forEach(c => {
+    const n = c.apolicesAtivas;
+    if (n <= 0) return;
+    counts[Math.min(n, 4) - 1]++;
+  });
+  const total = counts.reduce((s, v) => s + v, 0);
+  document.getElementById('cross-nivel-badge').textContent = fN(total) + ' clientes';
+  const ac = axisClr(), lc = labelClr(), gc = gridClr();
+  mkChart('ch-cross-nivel', {
+    type: 'bar',
+    data: {
+      labels: CROSS_NIVEIS.map(n => n.label),
+      datasets: [{ data: counts, backgroundColor: PALETA.slice(0, 4), borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.7 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' clientes (' + fP(total ? ctx.raw / total : 0) + ')' } }
+      },
+      scales: {
+        x: { ticks: { color: lc, font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: ac, font: { size: 10 }, precision: 0 }, grid: { color: gc } }
+      }
+    }
+  });
 }
 
 function renderCrossKPIs(clients, ramoList) {
