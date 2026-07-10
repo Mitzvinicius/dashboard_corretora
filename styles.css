@@ -64,6 +64,9 @@
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
+
+  /* Layout */
+  --kpi-min-width: 158px;
 }
 
 /* ── Reset ── */
@@ -177,7 +180,7 @@ body {
 
 .landing-card:hover {
   border-color: var(--accent);
-  background: var(--bg-raised2, var(--bg-raised));
+  background: var(--bg-raised);
   transform: translateY(-2px);
 }
 
@@ -300,7 +303,7 @@ body {
 
 #progress-bar-fill {
   height: 100%;
-  width: 0%;
+  width: 0;
   background: var(--accent);
   border-radius: 20px;
   transition: width .1s;
@@ -721,10 +724,11 @@ input[type=date]:focus {
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(158px, 220px));
+  /* auto-fit (não auto-fill) faz as colunas existentes esticarem pra preencher a
+     largura toda quando não há cards suficientes pra completar mais uma coluna. */
+  grid-template-columns: repeat(auto-fit, minmax(var(--kpi-min-width), 1fr));
   gap: 10px;
   margin-bottom: 16px;
-
 }
 
 .kpi {
@@ -1605,18 +1609,222 @@ input[type=date]:focus {
 }
 
 /* ══════════════════════════════════════════
+   MODO TV — esconde filtros para exibição passiva
+   ══════════════════════════════════════════ */
+
+body.tv-mode .filters,
+body.tv-mode .ret-filter-card,
+body.tv-mode .comp-filter-card,
+body.tv-mode .metas-inputs-bar {
+  display: none;
+}
+
+/* ══════════════════════════════════════════
+   CROSS-SELL TAB — campanha (meta de 3 fases)
+   ══════════════════════════════════════════ */
+
+.tier-goal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.tier-goal {
+  min-height: 130px;
+}
+
+.tier-goal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.tier-goal-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tier-goal-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.tier-goal-meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.tier-goal-track {
+  position: relative;
+  height: 24px;
+  background: var(--bg-elevated);
+  border-radius: var(--r-sm);
+  /* Os rótulos dos marcadores ficam ACIMA da barra (span usa top:-32px), então o
+     respiro precisa vir do margin-top, não do margin-bottom — senão o rótulo
+     invade o texto do header de cima (era o bug do print). */
+  margin-top: 40px;
+  margin-bottom: 8px;
+}
+
+.tier-goal-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #1D9E75, #2DD4A0);
+  border-radius: var(--r-sm);
+  transition: width .4s;
+}
+
+.tier-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateX(-50%);
+}
+
+.tier-marker.reached {
+  background: rgba(45, 212, 160, 0.8);
+}
+
+.tier-marker span {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.tier-marker.reached span {
+  color: var(--pos-text);
+}
+
+.tier-goal-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.podium-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.podium-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+}
+
+.podium-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 130px;
+  min-width: 0;
+}
+
+.podium-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podium-block {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  border: 1px solid var(--border-subtle);
+  border-bottom: none;
+}
+
+.podium-p1 .podium-block {
+  height: 64px;
+  background: linear-gradient(180deg, var(--rank-1-bg), transparent);
+  border-color: rgba(245, 166, 35, .35);
+}
+
+.podium-p2 .podium-block {
+  height: 46px;
+  background: linear-gradient(180deg, var(--rank-2-bg), transparent);
+  border-color: rgba(78, 128, 255, .35);
+}
+
+.podium-p3 .podium-block {
+  height: 32px;
+  background: linear-gradient(180deg, var(--rank-3-bg), transparent);
+  border-color: rgba(167, 139, 250, .35);
+}
+
+@media (max-width: 700px) {
+  .tier-goal-grid,
+  .podium-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ══════════════════════════════════════════
    CROSS-SELL TAB — penetration bars
    ══════════════════════════════════════════ */
+
+.pen-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Alvo de altura: casa com a altura do card vizinho (Clientes por nível, 240px)
+     no charts-grid — só é atingido quando poucas barras cabem, aí elas crescem
+     para preencher esse espaço. Com muitas barras, o conteúdo excede esse valor
+     e cada linha fica na espessura mínima (.pen-row min-height), sem espremer. */
+  min-height: 240px;
+}
 
 .pen-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
-}
-
-.pen-row:last-child {
-  margin-bottom: 0;
+  flex: 1 1 0;
+  min-height: 28px;
 }
 
 .pen-label {
@@ -1635,7 +1843,7 @@ input[type=date]:focus {
 .pen-bar {
   flex: 1;
   display: flex;
-  height: 28px;
+  height: 100%;
   border-radius: var(--r-sm);
   background: var(--bg-elevated);
   min-width: 0;
@@ -1657,7 +1865,13 @@ input[type=date]:focus {
   font-weight: 700;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  color: #241a02;
+  /* Fundo próprio (não a cor direta do gradiente) porque em barras estreitas o
+     texto transborda pra fora do dourado, caindo sobre o fundo escuro do card —
+     texto escuro direto no dourado ficava ilegível nessa sobra. */
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .pen-seg-no {
@@ -1677,6 +1891,25 @@ input[type=date]:focus {
   font-variant-numeric: tabular-nums;
   color: var(--neg-text);
   white-space: nowrap;
+}
+
+.pen-seg-opp {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, #3654A6, #4E80FF);
+  white-space: nowrap;
+  overflow: visible;
+  z-index: 1;
+}
+
+.pen-seg-opp span {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: #fff;
 }
 
 /* ══════════════════════════════════════════

@@ -75,6 +75,7 @@
       </div>
       <div class="topbar-actions">
         <span id="rec-badge"></span>
+        <button class="btn-sm" id="tv-mode-btn" onclick="toggleTvMode()">&#128250; Modo TV</button>
         <button class="btn-sm" style="border-color:#1D9E75; color:#1D9E75; font-weight:600;"
           onclick="exportExecutiveSummary()">Exportar Resumo</button>
         <button class="btn-sm" onclick="document.getElementById('fi2').click()">&#8593; Novo relatório</button>
@@ -487,9 +488,17 @@
       <div class="charts-grid" style="margin-bottom:14px">
         <div class="chart-card">
           <div class="chart-top">
-            <span class="chart-title">Penetração por ramo</span>
+            <span class="chart-title" id="cross-pen-title">Penetração por ramo</span>
+            <div class="view-toggle">
+              <input type="radio" name="cross-pen-mode" id="cpm-pen" value="penetracao" checked
+                onchange="setCrossPenMode('penetracao')">
+              <label for="cpm-pen">Penetração</label>
+              <input type="radio" name="cross-pen-mode" id="cpm-opp" value="oportunidade"
+                onchange="setCrossPenMode('oportunidade')">
+              <label for="cpm-opp">Oportunidade</label>
+            </div>
           </div>
-          <div id="cross-pen-wrap"></div>
+          <div class="pen-wrap" id="cross-pen-wrap"></div>
         </div>
         <div class="chart-card">
           <div class="chart-top">
@@ -497,6 +506,19 @@
             <span class="chart-badge" id="cross-nivel-badge">—</span>
           </div>
           <div class="cw" style="height:240px"><canvas id="ch-cross-nivel"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Campanha SANTOLIN 360 — metas do 3º trimestre -->
+      <div class="section-card" id="sc-cross-campanha">
+        <div class="section-header open" onclick="toggleSection('cross-campanha')">
+          <span class="section-title">Campanha SANTOLIN 360 — 3º trimestre 2026</span>
+          <div class="section-controls" onclick="event.stopPropagation()">
+            <button class="collapse-btn" id="cb-cross-campanha">−</button>
+          </div>
+        </div>
+        <div class="section-body" id="sb-cross-campanha">
+          <div id="cross-campanha-wrap" style="padding:16px"></div>
         </div>
       </div>
 

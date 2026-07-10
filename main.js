@@ -12,6 +12,7 @@ const CROSS = { pessoa: 'PF', col: new Set(), ram: new Set() };
 let crossSearch = '';
 let crossSortKey = 'ltv', crossSortDir = 'desc';
 let crossPage = 1;
+let crossPenMode = 'penetracao'; // 'penetracao' | 'oportunidade'
 const CROSS_PAGE_SIZE = 50;
 let activeCancelMotivos = null;
 const charts = {};
@@ -23,7 +24,7 @@ const RET_MS = { col: new Set(), ram: new Set(), grp: new Set(), mot: new Set() 
 let retActiveTipos = new Set();
 let retDetailFilter = '';
 let retSortKey = 'pctQtd', retSortDir = 'desc';
-const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
+const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
 let metaSortKey = 'totalAnt', metaSortDir = 'desc';
 let metaWeekTeam = 'geral';    // geral | pessoais | patrimoniais
 let metaWeekMetric = 'premio'; // premio | comissao
@@ -56,7 +57,7 @@ const COL = {
   fim: 'TÉRMINO DE VIGÊNCIA', cli: 'CLIENTE', seg: 'SEGURADORA',
   ramo: 'RAMO', grp: 'GRUPO DE PRODUÇÃO', premio: 'PRÊMIO', com: 'COMISSÃO',
   colab: 'COLABORADOR', sit: 'SITUAÇÃO', motivo: 'MOTIVO CANCELAMENTO', cancel: 'DATA CANCELAMENTO',
-  doc: 'CPF/CNPJ', pessoa: 'TIPO PESSOA', tipoDoc: 'TIPO DOCUMENTO'
+  doc: 'CPF/CNPJ', pessoa: 'TIPO PESSOA', tipoDoc: 'TIPO DOCUMENTO', campanha: 'CAMPANHA'
 };
 const TIPO_LABELS = { R: 'R — Renovação', N: 'N — Negócio novo', ER: 'ER — Endosso renov.', EN: 'EN — Endosso novo', CR: 'CR — Cancel. renov.', CN: 'CN — Cancel. novo' };
 const PALETA = ['#378ADD', '#639922', '#E24B4A', '#BA7517', '#534AB7', '#1D9E75', '#D4537E', '#888780', '#5DCAA5', '#F09595', '#97C459', '#BC8CFF'];
@@ -109,6 +110,21 @@ function churnBadge(pct) {
   const cls = pct >= 0.15 ? 'churn-badge-red' : pct >= 0.05 ? 'churn-badge-amber' : 'churn-badge-green';
   return `<span class="churn-badge ${cls}">${fP(pct)}</span>`;
 }
+
+// ── Modo TV ────────────────────────────────────────────────────────────────────
+// Esconde as barras de filtro para exibição passiva (ex: TV do time). Preferência
+// salva no localStorage — persiste entre reloads, já que a tela fica ligada o dia todo.
+function applyTvMode(on) {
+  document.body.classList.toggle('tv-mode', on);
+  const btn = document.getElementById('tv-mode-btn');
+  if (btn) btn.innerHTML = on ? '&#128250; Sair do modo TV' : '&#128250; Modo TV';
+}
+function toggleTvMode() {
+  const on = !document.body.classList.contains('tv-mode');
+  localStorage.setItem('tvMode', on ? '1' : '0');
+  applyTvMode(on);
+}
+applyTvMode(localStorage.getItem('tvMode') === '1');
 
 // ── Tab navigation ─────────────────────────────────────────────────────────────
 function hasProducaoData() { return ALL.length > 0; }
@@ -315,7 +331,8 @@ function parseProducaoArrayBuffer(buf) {
       premio: parseFloat(r[COL.premio]) || 0, com: parseFloat(r[COL.com]) || 0,
       colab: String(r[COL.colab] || ''), sit: String(r[COL.sit] || ''),
       motivo: String(r[COL.motivo] || ''), cancel: toDate(r[COL.cancel]),
-      docDigits, tipoPessoa, tipoDoc: String(r[COL.tipoDoc] || '').trim()
+      docDigits, tipoPessoa, tipoDoc: String(r[COL.tipoDoc] || '').trim(),
+      campanha: String(r[COL.campanha] || '').trim()
     };
   });
 }
@@ -1103,17 +1120,14 @@ function renderCohorts() {
     for (let i = 0; i <= 12; i++) {
       if (c.drops[i]) remaining -= c.drops[i];
       const pct = c.emitidas > 0 ? (remaining / c.emitidas) : 0;
-      let bgColor = '';
+      let bg = '';
       let color = '';
       if (c.emitidas > 0) {
         const hue = Math.max(0, (pct - 0.7) * 3.33) * 120;
-        bgColor = `background: hsla(${hue}, 70%, 50%, 0.15);`;
-        if (dark()) {
-          color = '#c9d1d9';
-          bgColor = `background: hsla(${hue}, 70%, 50%, 0.25);`;
-        }
+        bg = `hsla(${hue}, 70%, 50%, ${dark() ? 0.25 : 0.15})`;
+        if (dark()) color = '#c9d1d9';
       }
-      html += `<td style="${bgColor}color:${color};font-size:11px">${c.emitidas > 0 ? (pct * 100).toFixed(0) + '%' : '-'}</td>`;
+      html += `<td style="background:${bg};color:${color};font-size:11px">${c.emitidas > 0 ? (pct * 100).toFixed(0) + '%' : '-'}</td>`;
     }
     html += `</tr>`;
   });
@@ -1178,7 +1192,7 @@ function renderRiskWarning() {
         <td>${r.ramo.toLowerCase().replace(/^\w/, c => c.toUpperCase())}</td>
         <td>${r.colab.split(' - ')[0].trim()}</td>
         <td class="num">${fBRL(r.premio)}</td>
-        <td align="center">${riskBadge[r.rank] || '-'}</td>
+        <td style="text-align:center">${riskBadge[r.rank] || '-'}</td>
       </tr>`).join('');
 
   document.getElementById('ret-risco-wrap').innerHTML = `<table class="ret-table">
@@ -1370,6 +1384,107 @@ function renderRetDetailTable() {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── CROSS-SELL ────────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
+
+// Campanha SANTOLIN 360 — meta de 3 fases para o 3º trimestre de 2026.
+// Conta apólices (não endosso/fatura) com CAMPANHA = "SANTOLIN 360" e início de
+// vigência dentro do trimestre, independente dos filtros de PF/PJ/ramo/colaborador
+// da aba (é uma meta única da empresa, não recorta por segmento).
+const CAMPANHA_360_NOME = 'SANTOLIN 360';
+const CAMPANHA_360_INICIO = '2026-07-01';
+const CAMPANHA_360_FIM = '2026-09-30';
+const CAMPANHA_360_FASES_QTD = [120, 150, 180];
+const CAMPANHA_360_FASES_COM = [77000, 97000, 115000];
+
+function getCampanha360Rows() {
+  const alvo = normRamo(CAMPANHA_360_NOME);
+  return ALL.filter(r =>
+    r.tipoDoc === 'APÓLICE' &&
+    normRamo(r.campanha) === alvo &&
+    r.vig && fmtD(r.vig) >= CAMPANHA_360_INICIO && fmtD(r.vig) <= CAMPANHA_360_FIM
+  );
+}
+
+function renderTierGoal(label, valor, fases, formatador) {
+  const metaFinal = fases[fases.length - 1];
+  const pct = metaFinal > 0 ? Math.min(1, valor / metaFinal) : 0;
+  const faseAtual = fases.filter(f => valor >= f).length;
+  const marcadores = fases.map((f, i) => {
+    const pos = metaFinal > 0 ? Math.min(100, (f / metaFinal) * 100) : 0;
+    const atingida = valor >= f;
+    return `<div class="tier-marker ${atingida ? 'reached' : ''}" style="left:${pos}%"><span>Fase ${i + 1}<br>${formatador(f)}</span></div>`;
+  }).join('');
+  return `
+    <div class="tier-goal">
+      <div class="tier-goal-header">
+        <span class="tier-goal-title">${label}</span>
+        <span class="tier-goal-value">${formatador(valor)} <span class="tier-goal-meta">/ ${formatador(metaFinal)}</span></span>
+      </div>
+      <div class="tier-goal-track">
+        <div class="tier-goal-fill" style="width:${(pct * 100).toFixed(2)}%"></div>
+        ${marcadores}
+      </div>
+      <div class="tier-goal-badge">${faseAtual > 0 ? 'Fase ' + faseAtual + ' de ' + fases.length + ' concluída' : 'Nenhuma fase concluída ainda'}</div>
+    </div>`;
+}
+
+// Top 3 colaboradores por apólices vendidas ou por comissão, dentro da campanha.
+function getCampanha360Ranking(rows, metric) {
+  const map = new Map();
+  rows.forEach(r => {
+    const k = r.colab || 'Sem identificação';
+    if (!map.has(k)) map.set(k, { colab: k, qtd: 0, comissao: 0 });
+    const c = map.get(k);
+    c.qtd++;
+    c.comissao += r.com;
+  });
+  return [...map.values()].sort((a, b) => b[metric] - a[metric]).slice(0, 3);
+}
+
+// Só os nomes (sem valores), em formato de pódio — 2º à esquerda, 1º no centro, 3º à direita.
+function renderPodium(top3) {
+  const nome = i => top3[i] ? top3[i].colab : '—';
+  return `
+    <div class="podium">
+      <div class="podium-step podium-p2">
+        <div class="podium-name" title="${nome(1)}">${nome(1)}</div>
+        <div class="podium-block"><span class="rank-badge r2">2</span></div>
+      </div>
+      <div class="podium-step podium-p1">
+        <div class="podium-name" title="${nome(0)}">${nome(0)}</div>
+        <div class="podium-block"><span class="rank-badge r1">1</span></div>
+      </div>
+      <div class="podium-step podium-p3">
+        <div class="podium-name" title="${nome(2)}">${nome(2)}</div>
+        <div class="podium-block"><span class="rank-badge r3">3</span></div>
+      </div>
+    </div>`;
+}
+
+function renderCrossCampanha360() {
+  const wrap = document.getElementById('cross-campanha-wrap');
+  if (!wrap) return;
+  const rows = getCampanha360Rows();
+  const qtd = rows.length;
+  const comissao = rows.reduce((s, r) => s + r.com, 0);
+  const rankQtd = getCampanha360Ranking(rows, 'qtd');
+  const rankCom = getCampanha360Ranking(rows, 'comissao');
+  wrap.innerHTML = `
+    <div class="tier-goal-grid">
+      ${renderTierGoal('Apólices vendidas', qtd, CAMPANHA_360_FASES_QTD, fN)}
+      ${renderTierGoal('Comissão gerada', comissao, CAMPANHA_360_FASES_COM, fBRL)}
+    </div>
+    <div class="podium-grid">
+      <div class="podium-col">
+        <div class="podium-title">Top 3 — Apólices vendidas</div>
+        ${renderPodium(rankQtd)}
+      </div>
+      <div class="podium-col">
+        <div class="podium-title">Top 3 — Comissão gerada</div>
+        ${renderPodium(rankCom)}
+      </div>
+    </div>`;
+}
+
 // Ramos principais da corretora, pré-ativados por padrão no filtro de ramo do
 // Cross-sell (match por trecho normalizado, mesmo critério de classifyRamo).
 // Demais ramos ficam disponíveis no filtro para o usuário ativar manualmente.
@@ -1466,6 +1581,7 @@ function setCrossSort(key) {
 function renderCrossTab() {
   const clients = getCrossClients();
   const ramoList = getCrossRamoList();
+  renderCrossCampanha360();
   renderCrossKPIs(clients, ramoList);
   renderCrossPenetracao(clients, ramoList);
   renderCrossNivel(clients);
@@ -1509,43 +1625,106 @@ function renderCrossNivel(clients) {
   });
 }
 
+// Ticket médio de comissão por ramo: só conta apólices (não endosso/fatura) ativas
+// dos clientes filtrados atualmente — mesma base usada no resto da aba.
+function getCrossRamoStats(clients, ramoList) {
+  const docSet = new Set(clients.map(c => c.doc));
+  const stats = {};
+  ramoList.forEach(r => { stats[r] = { comSum: 0, count: 0 }; });
+  ALL.forEach(r => {
+    if (!docSet.has(r.docDigits) || r.sit !== 'Ativa' || r.tipoDoc !== 'APÓLICE') return;
+    const s = stats[r.ramo];
+    if (!s) return;
+    s.comSum += r.com; s.count++;
+  });
+  Object.values(stats).forEach(s => { s.ticketMedio = s.count ? s.comSum / s.count : 0; });
+  return stats;
+}
+
 function renderCrossKPIs(clients, ramoList) {
   const totalDocsAll = new Set(ALL.filter(r => r.docDigits).map(r => r.docDigits)).size;
   const comissaoTotal = clients.reduce((s, c) => s + c.comissaoTotal, 0);
   const withLtv = clients.filter(c => c.ltv != null);
   const ltvMedio = withLtv.length ? withLtv.reduce((s, c) => s + c.ltv, 0) / withLtv.length : 0;
 
-  let maisPopular = { ramo: '—', pct: 0 }, maiorOportunidade = { ramo: '—', pct: 1 };
+  let maisPopular = { ramo: '—', pct: 0 }, maiorOportunidade = { ramo: '—', valor: 0 };
+  let maiorLtvRamo = { ramo: '—', valor: 0 };
   if (clients.length && ramoList.length) {
+    const stats = getCrossRamoStats(clients, ramoList);
     ramoList.forEach(ramo => {
-      const pct = clients.filter(c => c.ramosAtivos.has(ramo)).length / clients.length;
+      const has = clients.filter(c => c.ramosAtivos.has(ramo)).length;
+      const pct = has / clients.length;
       if (pct > maisPopular.pct) maisPopular = { ramo, pct };
-      if (pct < maiorOportunidade.pct) maiorOportunidade = { ramo, pct };
+      // Oportunidade de comissão = clientes sem o ramo × ticket médio de comissão do ramo.
+      const valor = (clients.length - has) * stats[ramo].ticketMedio;
+      if (valor > maiorOportunidade.valor) maiorOportunidade = { ramo, valor };
+      // LTV médio dos clientes que possuem este ramo (só quem tem LTV calculável, >1 ano).
+      const clientesRamoComLtv = withLtv.filter(c => c.ramosAtivos.has(ramo));
+      if (clientesRamoComLtv.length) {
+        const ltvMedioRamo = clientesRamoComLtv.reduce((s, c) => s + c.ltv, 0) / clientesRamoComLtv.length;
+        if (ltvMedioRamo > maiorLtvRamo.valor) maiorLtvRamo = { ramo, valor: ltvMedioRamo };
+      }
     });
   }
+
+  // Tempo médio de permanência: só entra quem tem 1ª vigência registrada (não distorce com fallback de dado ausente).
+  const withVig = clients.filter(c => c.primeiraVig);
+  const tempoMedio = withVig.length ? withVig.reduce((s, c) => s + c.anos, 0) / withVig.length : 0;
 
   document.getElementById('cross-kpi-grid').innerHTML = [
     { l: 'Total de clientes', v: fN(clients.length), s: fN(totalDocsAll) + ' no total (PF+PJ)', c: 'k-teal' },
     { l: 'Comissão total (LTV)', v: fBRL(comissaoTotal), s: fN(ramoList.length) + ' ramos mapeados', c: 'k-green' },
     { l: 'LTV médio por cliente', v: fBRL(ltvMedio), s: fN(withLtv.length) + ' c/ histórico >1 ano', c: 'k-purple' },
     { l: 'Ramo mais popular', v: maisPopular.ramo, s: fP(maisPopular.pct) + ' dos clientes', c: 'k-blue' },
-    { l: 'Maior oportunidade', v: maiorOportunidade.ramo, s: fP(maiorOportunidade.pct) + ' possuem', c: 'k-red' },
+    { l: 'Maior oportunidade', v: maiorOportunidade.ramo, s: fBRL(maiorOportunidade.valor) + ' em comissão potencial', c: 'k-red' },
+    { l: 'Ramo com maior LTV', v: fBRL(maiorLtvRamo.valor), s: maiorLtvRamo.ramo, c: 'k-amber' },
+    { l: 'Tempo médio de permanência', v: tempoMedio.toFixed(1).replace('.', ',') + ' anos', s: fN(withVig.length) + ' clientes na base', c: 'k-teal' },
   ].map(k => `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+}
+
+function setCrossPenMode(mode) {
+  crossPenMode = mode;
+  renderCrossPenetracao(getCrossClients(), getCrossRamoList());
 }
 
 function renderCrossPenetracao(clients, ramoList) {
   const total = clients.length;
   const wrap = document.getElementById('cross-pen-wrap');
+  const titleEl = document.getElementById('cross-pen-title');
+  const isOpp = crossPenMode === 'oportunidade';
+  if (titleEl) titleEl.textContent = isOpp ? 'Oportunidade de comissão por ramo' : 'Penetração por ramo';
+
   if (!ramoList.length || !total) {
     wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px">Nenhum dado para o filtro atual.</div>';
     return;
   }
-  const rows = ramoList.map(ramo => {
-    const has = clients.filter(c => c.ramosAtivos.has(ramo)).length;
-    const pctHas = has / total;
-    return { ramo, has, not: total - has, pctHas };
-  }).sort((a, b) => b.pctHas - a.pctHas);
 
+  const base = ramoList.map(ramo => {
+    const has = clients.filter(c => c.ramosAtivos.has(ramo)).length;
+    return { ramo, has, not: total - has, pctHas: has / total };
+  });
+
+  if (isOpp) {
+    const stats = getCrossRamoStats(clients, ramoList);
+    const rows = base.map(r => {
+      const ticketMedio = stats[r.ramo].ticketMedio;
+      return { ...r, ticketMedio, oportunidade: r.not * ticketMedio };
+    }).sort((a, b) => b.oportunidade - a.oportunidade);
+    const maxOp = rows.length ? rows[0].oportunidade : 0;
+
+    wrap.innerHTML = rows.map(r => `
+      <div class="pen-row">
+        <div class="pen-label" title="${r.ramo}">${r.ramo}</div>
+        <div class="pen-bar">
+          <div class="pen-seg-opp" style="width:${maxOp > 0 ? (r.oportunidade / maxOp * 100).toFixed(2) : 0}%">
+            <span>${fBRL(r.oportunidade)} · ${fN(r.not)} sem × ${fBRL(r.ticketMedio)}</span>
+          </div>
+        </div>
+      </div>`).join('');
+    return;
+  }
+
+  const rows = base.sort((a, b) => b.pctHas - a.pctHas);
   wrap.innerHTML = rows.map(r => `
     <div class="pen-row">
       <div class="pen-label" title="${r.ramo}">${r.ramo}</div>
