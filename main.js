@@ -2550,22 +2550,31 @@ function buildMetasSemanal() {
       };
     });
   });
-  getMetasRealizadoData().forEach(r => {
+  const realizado = getMetasRealizadoData(); // já filtrado por vigência no período
+
+  // Cards resumo (totais do período): por vigência — soma direta, independente
+  // de qual semana o registro cai no gráfico abaixo.
+  const totals = {};
+  TEAMS.forEach(t => { totals[t] = { realPremio: 0, realCom: 0, metaPremio: teamMeta[t].premio, metaCom: teamMeta[t].com }; });
+  realizado.forEach(r => {
     const team = classifyRamo(r.ramo); // pessoais | patrimoniais (excluídos já fora)
-    const ds = fmtD(r.vig);
-    const w = weeks.find(w => ds >= w.startStr && ds <= w.endStr);
-    if (!w || !w.byTeam[team]) return;
+    if (!totals[team]) return;
+    totals[team].realPremio += r.premio; totals[team].realCom += r.com;
+    totals.geral.realPremio += r.premio; totals.geral.realCom += r.com;
+  });
+
+  // Gráfico/apresentação semana a semana: por emissão. A emissão pode cair fora
+  // das semanas do período (o registro já está garantido no período pela vigência);
+  // nesse caso joga na semana da borda mais próxima para não sumir do gráfico.
+  realizado.forEach(r => {
+    const team = classifyRamo(r.ramo);
+    const ds = fmtD(r.em);
+    if (!ds) return;
+    let w = weeks.find(w => ds >= w.startStr && ds <= w.endStr);
+    if (!w) w = ds < weeks[0].startStr ? weeks[0] : weeks[weeks.length - 1];
+    if (!w.byTeam[team]) return;
     w.byTeam[team].realPremio += r.premio; w.byTeam[team].realCom += r.com;
     w.byTeam.geral.realPremio += r.premio; w.byTeam.geral.realCom += r.com;
-  });
-  const totals = {};
-  TEAMS.forEach(t => {
-    totals[t] = {
-      realPremio: weeks.reduce((s, w) => s + w.byTeam[t].realPremio, 0),
-      realCom: weeks.reduce((s, w) => s + w.byTeam[t].realCom, 0),
-      metaPremio: teamMeta[t].premio,
-      metaCom: teamMeta[t].com,
-    };
   });
   return { hasPeriod: true, weeks, totals };
 }
