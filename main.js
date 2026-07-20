@@ -3384,3 +3384,340 @@ function exportMetasData(type) {
     XLSX.writeFile(wb, 'Metas_Equipe.xlsx');
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── EXIBIÇÃO TV ───────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Tela cheia dedicada para rodar numa TV: metade direita com indicadores gerais
+// da carteira, metade esquerda reservada para conteúdo futuro. Ignora os filtros
+// globais de propósito — é sempre a foto da base inteira (ALL), não a seleção
+// que um analista deixou marcada no dashboard.
+let tvExibicaoKeyHandler = null;
+const TV_EX_CHART_IDS = ['tv-ex-ano-chart', 'tv-ex-nivel-chart'];
+
+// Colaboradores fora de todos os gráficos da Exibição TV (pedido específico desta
+// tela — não mexe em nenhum outro lugar do dashboard). Compara pelo primeiro nome,
+// sem acento/maiúsculas, pra pegar variações de grafia do cadastro.
+const TV_COLAB_EXCLUIDOS = ['CELSO', 'DENISE'];
+const tvColabExcluido = colab => TV_COLAB_EXCLUIDOS.some(nome => normRamo(colab).startsWith(nome));
+const tvBaseRows = () => ALL.filter(r => !tvColabExcluido(r.colab));
+
+function openTvExibicao() {
+  if (!ALL.length) { alert('Carregue os dados antes de abrir a exibição.'); return; }
+  let ov = document.getElementById('tv-exibicao');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'tv-exibicao';
+    ov.innerHTML = `
+      <button class="tv-ex-exit" onclick="closeTvExibicao()" title="Sair (Esc)">✕</button>
+      <div class="tv-ex-grid">
+        <div class="tv-ex-left">
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Meta mensal — Seguros novos</span>
+              <span class="chart-badge" id="tv-ex-novos-badge">—</span>
+            </div>
+            <div class="tv-ex-novos-body" id="tv-ex-novos-body"></div>
+          </div>
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Comissão gerada — Seguros novos</span>
+              <span class="chart-badge" id="tv-ex-com-badge">—</span>
+            </div>
+            <div id="tv-ex-com-list"></div>
+          </div>
+        </div>
+        <div class="tv-ex-right">
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Carteira acumulada — apólices ativas por ano</span>
+              <span class="chart-badge" id="tv-ex-ano-badge">—</span>
+            </div>
+            <div class="tv-ex-chart-wrap"><canvas id="tv-ex-ano-chart"></canvas></div>
+          </div>
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Clientes por nível</span>
+              <span class="chart-badge" id="tv-ex-nivel-badge">—</span>
+            </div>
+            <div class="tv-ex-chart-wrap"><canvas id="tv-ex-nivel-chart"></canvas></div>
+          </div>
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Top 3 vendedores — Santolin 360</span>
+              <span class="chart-badge" id="tv-ex-rank-badge">—</span>
+            </div>
+            <div id="tv-ex-rank-list"></div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  tvExibicaoKeyHandler = e => { if (e.key === 'Escape') closeTvExibicao(); };
+  document.addEventListener('keydown', tvExibicaoKeyHandler);
+  renderTvExibicao();
+}
+
+function closeTvExibicao() {
+  const ov = document.getElementById('tv-exibicao');
+  if (ov) ov.style.display = 'none';
+  TV_EX_CHART_IDS.forEach(id => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } });
+  if (tvExibicaoKeyHandler) { document.removeEventListener('keydown', tvExibicaoKeyHandler); tvExibicaoKeyHandler = null; }
+}
+
+function renderTvExibicao() {
+  renderTvExMetaNovos();
+  renderTvExComissaoVendedores();
+  renderTvExAnoChart();
+  renderTvExNivelChart();
+  renderTvExRanking();
+}
+
+// Comissão gerada por vendedor no mês corrente — só tipo de negócio N (negócio
+// novo, sem contar endosso novo) e ramos elegíveis à meta via classifyRamo,
+// agrupada por colaborador.
+function buildTvComissaoVendedores() {
+  const now = today();
+  const y = now.getFullYear(), mIdx = now.getMonth();
+  const pad = n => String(n).padStart(2, '0');
+  const lastDay = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
+  const curStart = `${y}-${pad(mIdx + 1)}-01`, curEnd = `${y}-${pad(mIdx + 1)}-${pad(lastDay(y, mIdx))}`;
+  const map = {};
+  tvBaseRows().forEach(r => {
+    if (r.tipo !== 'N') return;
+    if (classifyRamo(r.ramo) === 'excluded') return;
+    const ds = fmtD(r.vig);
+    if (!ds || ds < curStart || ds > curEnd) return;
+    const k = r.colab || 'Sem identificação';
+    map[k] = (map[k] || 0) + r.com;
+  });
+  return { curStart, rows: Object.entries(map).map(([nome, com]) => ({ nome, com })).sort((a, b) => b.com - a.com) };
+}
+
+// Cabe sem rolagem numa tela de TV — corta no que couber confortavelmente em vez
+// de listar todo mundo (a lista já vem ordenada, então quem fica de fora é sempre
+// quem gerou menos comissão no mês).
+const TV_COM_LIST_MAX = 8;
+
+function renderTvExComissaoVendedores() {
+  const list = document.getElementById('tv-ex-com-list');
+  if (!list) return;
+  const { curStart, rows: allRows } = buildTvComissaoVendedores();
+  const rows = allRows.slice(0, TV_COM_LIST_MAX);
+  const ML = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const [y, m] = curStart.split('-');
+  document.getElementById('tv-ex-com-badge').textContent = ML[+m - 1] + '/' + y;
+  if (!rows.length) {
+    list.innerHTML = '<div class="tv-ex-rank-empty">Nenhuma comissão gerada neste mês ainda.</div>';
+    return;
+  }
+  const medalCls = ['gold', 'silver', 'bronze'];
+  list.innerHTML = rows.map((r, i) => {
+    const shortName = r.nome.split(' - ')[0].split('|')[0].trim();
+    return `<div class="tv-ex-com-row">
+      <span class="tv-ex-com-idx ${medalCls[i] || ''}">${i + 1}</span>
+      <span class="tv-ex-com-name">${shortName}</span>
+      <span class="tv-ex-com-value">${fBRL(r.com)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Lado esquerdo: meta mensal de seguros novos ─────────────────────────────
+// Mesmo classifyRamo da aba Metas (ramos elegíveis/excluídos, split pessoais x
+// patrimoniais), mas só tipo de negócio N (sem endosso novo/renovações) — fixa
+// no mês corrente comparado ao mesmo mês do ano anterior, com crescimento fixo
+// de 40% (não usa o filtro de vigência nem o % configurável da aba Metas).
+const TV_NOVOS_GROWTH = 1.40;
+
+function buildTvMetaNovos() {
+  const now = today();
+  const y = now.getFullYear(), mIdx = now.getMonth(); // 0-indexado
+  const pad = n => String(n).padStart(2, '0');
+  const lastDay = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
+  const curStart = `${y}-${pad(mIdx + 1)}-01`, curEnd = `${y}-${pad(mIdx + 1)}-${pad(lastDay(y, mIdx))}`;
+  const baseY = y - 1;
+  const baseStart = `${baseY}-${pad(mIdx + 1)}-01`, baseEnd = `${baseY}-${pad(mIdx + 1)}-${pad(lastDay(baseY, mIdx))}`;
+
+  const TEAMS = ['geral', 'pessoais', 'patrimoniais'];
+  const data = {};
+  TEAMS.forEach(t => { data[t] = { realPremio: 0, realCom: 0, basePremio: 0, baseCom: 0 }; });
+
+  tvBaseRows().forEach(r => {
+    if (r.tipo !== 'N') return; // só tipo de negócio N
+    const team = classifyRamo(r.ramo); // exclui ramos fora da meta (classifyRamo === 'excluded')
+    if (!data[team]) return;
+    const ds = fmtD(r.vig);
+    if (!ds) return;
+    const acc = ds >= curStart && ds <= curEnd ? 'real' : ds >= baseStart && ds <= baseEnd ? 'base' : null;
+    if (!acc) return;
+    [data[team], data.geral].forEach(d => { d[acc + 'Premio'] += r.premio; d[acc + 'Com'] += r.com; });
+  });
+
+  TEAMS.forEach(t => {
+    data[t].metaPremio = data[t].basePremio * TV_NOVOS_GROWTH;
+    data[t].metaCom = data[t].baseCom * TV_NOVOS_GROWTH;
+  });
+
+  return { curStart, data };
+}
+
+function renderTvExMetaNovos() {
+  const body = document.getElementById('tv-ex-novos-body');
+  if (!body) return;
+  const { curStart, data } = buildTvMetaNovos();
+  const ML = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const [y, m] = curStart.split('-');
+  document.getElementById('tv-ex-novos-badge').textContent = ML[+m - 1] + '/' + y;
+
+  const pctCls = p => p >= 1 ? 'msem-ok' : p >= 0.8 ? 'msem-warn' : 'msem-bad';
+  const TEAMS = ['geral', 'pessoais', 'patrimoniais'];
+  const card = (t, metric) => {
+    const d = data[t];
+    const real = metric === 'comissao' ? d.realCom : d.realPremio;
+    const meta = metric === 'comissao' ? d.metaCom : d.metaPremio;
+    const pct = meta ? real / meta : 0, gap = real - meta;
+    const pctClamp = Math.max(0, Math.min(1, pct));
+    return `<div class="msem-card" style="--tc:${METAS_SEM_TEAM_COLOR[t]}">
+      <div class="msem-card-head"><span class="msem-dot"></span>${METAS_SEM_TEAM_LBL[t]}</div>
+      <div class="msem-pct ${pctCls(pct)}">${fP(pct)}</div>
+      <div class="msem-bar"><div class="msem-bar-fg" style="width:${(pctClamp * 100).toFixed(1)}%"></div></div>
+      <div class="msem-nums">${fBRL(real)} <span class="msem-meta">/ ${fBRL(meta)}</span></div>
+      <div class="msem-gap ${gap >= 0 ? 'pos' : 'neg'}">${gap >= 0 ? '+' : ''}${fBRL(gap)}</div>
+    </div>`;
+  };
+  const row = (metric, lbl) => `<div class="msem-row tv-ex-novos-row"><div class="msem-row-lbl">${lbl}</div>${TEAMS.map(t => card(t, metric)).join('')}</div>`;
+  body.innerHTML = row('premio', 'Prêmio') + row('comissao', 'Comissão');
+}
+
+// Todos os clientes (PF + PJ), de qualquer colaborador (carteira acumulada e
+// clientes por nível não excluem Celso/Denise — só o ranking e os cards da
+// esquerda excluem) — mesma lógica de agregação da aba Cross-sell (buildCrossMap).
+function tvExClientes() {
+  const map = new Map();
+  ALL.forEach(r => {
+    if (!r.docDigits) return;
+    let c = map.get(r.docDigits);
+    if (!c) { c = { doc: r.docDigits, apolicesAtivas: 0, primeiraVig: null }; map.set(r.docDigits, c); }
+    if (r.sit === 'Ativa' && r.tipoDoc === 'APÓLICE') c.apolicesAtivas++;
+    if (r.vig && (!c.primeiraVig || r.vig < c.primeiraVig)) c.primeiraVig = r.vig;
+  });
+  return [...map.values()];
+}
+
+// Carteira acumulada por ano: para cada apólice ativa hoje, usa o ano da PRIMEIRA
+// vigência do cliente como "ano de entrada" — a data de vigência sozinha se renova
+// a cada ano e esconderia o histórico de quando o cliente entrou na carteira. O
+// valor de cada ano é a soma corrida (acumulada) até ali.
+function buildTvAnoCarteira() {
+  const byYear = {};
+  tvExClientes().forEach(c => {
+    if (!c.primeiraVig || !c.apolicesAtivas) return;
+    const y = c.primeiraVig.getFullYear();
+    byYear[y] = (byYear[y] || 0) + c.apolicesAtivas;
+  });
+  const years = Object.keys(byYear).map(Number);
+  if (!years.length) return { labels: [], data: [] };
+  const minY = Math.min(...years), maxY = today().getFullYear();
+  const labels = [], data = [];
+  let running = 0;
+  for (let y = minY; y <= maxY; y++) {
+    running += byYear[y] || 0;
+    labels.push(String(y));
+    data.push(running);
+  }
+  return { labels, data };
+}
+
+function renderTvExAnoChart() {
+  const { labels, data } = buildTvAnoCarteira();
+  const total = data.length ? data[data.length - 1] : 0;
+  document.getElementById('tv-ex-ano-badge').textContent = fN(total) + ' apólices ativas';
+  const ac = axisClr(), lc = labelClr(), gc = gridClr();
+  mkChart('tv-ex-ano-chart', {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: 'Apólices', data, backgroundColor: '#4E80FF', borderRadius: 4, order: 2 },
+        { type: 'line', label: 'Tendência', data, borderColor: '#22D3EE', borderWidth: 3, pointRadius: 0, tension: .3, fill: false, order: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' apólices' } } },
+      scales: {
+        x: { ticks: { color: lc, font: { size: 12 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: ac, font: { size: 11 }, precision: 0 }, grid: { color: gc } },
+      },
+    },
+  });
+}
+
+// Clientes por nível — mesma classificação/contagem da aba Cross-sell (CROSS_NIVEIS),
+// mas sem os filtros de colaborador/busca daquela aba: é sempre a carteira inteira.
+function buildTvNivelCounts() {
+  const counts = [0, 0, 0, 0];
+  tvExClientes().forEach(c => {
+    const n = c.apolicesAtivas;
+    if (n <= 0) return;
+    counts[Math.min(n, 4) - 1]++;
+  });
+  return counts;
+}
+
+function renderTvExNivelChart() {
+  const counts = buildTvNivelCounts();
+  const total = counts.reduce((s, v) => s + v, 0);
+  document.getElementById('tv-ex-nivel-badge').textContent = fN(total) + ' clientes';
+  const ac = axisClr(), lc = labelClr(), gc = gridClr();
+  mkChart('tv-ex-nivel-chart', {
+    type: 'bar',
+    data: {
+      labels: CROSS_NIVEIS.map(n => n.label),
+      datasets: [{ data: counts, backgroundColor: PALETA.slice(0, 4), borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.7 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' clientes (' + fP(total ? ctx.raw / total : 0) + ')' } },
+      },
+      scales: {
+        x: { ticks: { color: lc, font: { size: 11 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: ac, font: { size: 11 }, precision: 0 }, grid: { color: gc } },
+      },
+    },
+  });
+}
+
+// Ranking da campanha SANTOLIN 360 — top 3 vendedores por quantidade de apólices
+// fechadas (reaproveita getCampanha360Rows: campo CAMPANHA = "Santolin 360",
+// só apólices e dentro do período da campanha), com o prêmio líquido somado ao lado.
+function buildTvRankingVendedores() {
+  const map = {};
+  getCampanha360Rows().filter(r => !tvColabExcluido(r.colab)).forEach(r => {
+    const k = r.colab || 'Sem identificação';
+    if (!map[k]) map[k] = { nome: k, qtd: 0, premio: 0 };
+    map[k].qtd++; map[k].premio += r.premio;
+  });
+  return Object.values(map).sort((a, b) => b.qtd - a.qtd).slice(0, 3);
+}
+
+function renderTvExRanking() {
+  const rows = buildTvRankingVendedores();
+  document.getElementById('tv-ex-rank-badge').textContent = CAMPANHA_360_NOME;
+  const list = document.getElementById('tv-ex-rank-list');
+  if (!rows.length) {
+    list.innerHTML = '<div class="tv-ex-rank-empty">Nenhuma apólice da campanha Santolin 360 ainda.</div>';
+    return;
+  }
+  list.innerHTML = rows.map((r, i) => {
+    const shortName = r.nome.split(' - ')[0].split('|')[0].trim();
+    return `<div class="tv-ex-rank-row">
+      <span class="rank-badge ${i === 0 ? 'r1' : i === 1 ? 'r2' : 'r3'}">${i + 1}</span>
+      <span class="tv-ex-rank-name">${shortName}</span>
+      <span class="tv-ex-rank-qtd">${fN(r.qtd)} apólices</span>
+      <span class="tv-ex-rank-premio">${fBRL(r.premio)}</span>
+    </div>`;
+  }).join('');
+}
