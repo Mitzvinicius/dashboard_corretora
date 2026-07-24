@@ -32,7 +32,7 @@ let metaWeekMetric = 'premio'; // premio | comissao
 // normRamo: maiúsculas, sem acento, espaços colapsados — tolera variações de grafia da planilha.
 const normRamo = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 // Ramos que NÃO entram na contagem da meta (match por trecho normalizado).
-const META_EXCLUDED_KEYS = ['VIAGEM', 'CARTA VERDE', 'ACIDENTES PESSOAIS', 'PREVIDENCIA', 'EVENTOS ALEATORIOS', 'TRANSPORTES NACIONAIS'];
+const META_EXCLUDED_KEYS = ['VIAGEM', 'CARTA VERDE', 'ACIDENTES PESSOAIS', 'PREVIDENCIA', 'EVENTOS ALEATORIOS', 'TRANSPORTE NACIONAL'];
 // Ramos da equipe Pessoal; os demais não-excluídos caem em Patrimonial.
 const META_PESSOAIS_KEYS = ['VIDA', 'SAUDE', 'ODONTO', 'RC PROFISSIONAL', 'RC GERAL', 'RC ADMINISTRADORES', 'ADMINISTRADORES E DIRETORES', 'D&O'];
 // → 'excluded' | 'pessoais' | 'patrimoniais'
@@ -1592,8 +1592,8 @@ function renderCrossTab() {
 const CROSS_NIVEIS = [
   { label: 'Nível 1 — Essencial' },
   { label: 'Nível 2 — Ampliada' },
-  { label: 'Nível 3 — Plena' },
-  { label: 'Nível 4 — Master' },
+  { label: 'Nível 3 — Avançada' },
+  { label: 'Nível 4 — Plena' },
 ];
 function renderCrossNivel(clients) {
   const counts = [0, 0, 0, 0];
@@ -2408,13 +2408,12 @@ function getMetasBasePeriod() {
 function filterMetasData(opts) {
   opts = opts || {};
   const { startStr, endStr } = getMetasBasePeriod();
-  // Honra os botões N / R do filtro "Tipo de documento"; mapeia endossos para o lado correspondente.
-  const sideSel = new Set();
-  activeTipos.forEach(t => { const s = metaTipoSide(t); if (s) sideSel.add(s); });
+  // Honra os botões de tipo (N, R, EN, ER...) do filtro "Tipo de documento" pelo
+  // tipo literal marcado — marcar só "N" traz só N (sem EN junto). Antes disso
+  // comparava pelo "lado" agrupado (metaTipoSide), que sempre juntava N+EN.
   return ALL.filter(r => {
-    const side = metaTipoSide(r.tipo);
-    if (!side) return false; // só N, R, EN, ER
-    if (sideSel.size && !sideSel.has(side)) return false;
+    if (!metaTipoSide(r.tipo)) return false; // só N, R, EN, ER entram na meta
+    if (activeTipos.size && !activeTipos.has(r.tipo)) return false;
     // comparação por string YYYY-MM-DD, idêntica à aba Produção (evita erro de fuso horário)
     const ds = fmtD(r.vig);
     if (!ds) return false;
@@ -2473,16 +2472,14 @@ function renderMetasTab() {
 
 // ── Acompanhamento semanal x meta ──────────────────────────────────────────────
 // Produção realizada no período selecionado (ano corrente), mesmo escopo da meta:
-// tipos N/R/EN/ER, ramos que contam, e honrando os filtros globais + botões N/R.
+// tipos N/R/EN/ER, ramos que contam, e honrando os filtros globais + botões de
+// tipo (pelo tipo literal marcado, não mais pelo "lado" agrupado — ver filterMetasData).
 function getMetasRealizadoData() {
   const vs = document.getElementById('f-vig-s').value;
   const ve = document.getElementById('f-vig-e').value;
-  const sideSel = new Set();
-  activeTipos.forEach(t => { const s = metaTipoSide(t); if (s) sideSel.add(s); });
   return ALL.filter(r => {
-    const side = metaTipoSide(r.tipo);
-    if (!side) return false;
-    if (sideSel.size && !sideSel.has(side)) return false;
+    if (!metaTipoSide(r.tipo)) return false;
+    if (activeTipos.size && !activeTipos.has(r.tipo)) return false;
     const ds = fmtD(r.vig);
     if (!ds) return false;
     if (vs && ds < vs) return false;
@@ -3398,7 +3395,7 @@ const TV_EX_CHART_IDS = ['tv-ex-ano-chart', 'tv-ex-nivel-chart'];
 // Colaboradores fora de todos os gráficos da Exibição TV (pedido específico desta
 // tela — não mexe em nenhum outro lugar do dashboard). Compara pelo primeiro nome,
 // sem acento/maiúsculas, pra pegar variações de grafia do cadastro.
-const TV_COLAB_EXCLUIDOS = ['CELSO', 'DENISE'];
+const TV_COLAB_EXCLUIDOS = ['CELSO', 'DENISE', 'ALESSANDRA'];
 const tvColabExcluido = colab => TV_COLAB_EXCLUIDOS.some(nome => normRamo(colab).startsWith(nome));
 const tvBaseRows = () => ALL.filter(r => !tvColabExcluido(r.colab));
 
@@ -3419,12 +3416,13 @@ function openTvExibicao() {
             </div>
             <div class="tv-ex-novos-body" id="tv-ex-novos-body"></div>
           </div>
+          <div class="tv-ex-santolin-bar" id="tv-ex-santolin-com"></div>
           <div class="tv-ex-card">
             <div class="chart-top">
-              <span class="chart-title">Comissão gerada — Seguros novos</span>
-              <span class="chart-badge" id="tv-ex-com-badge">—</span>
+              <span class="chart-title">Top 3 vendedores — Santolin 360</span>
+              <span class="chart-badge" id="tv-ex-santolin-badge">—</span>
             </div>
-            <div id="tv-ex-com-list"></div>
+            <div class="podium-grid tv-ex-santolin-podium" id="tv-ex-santolin-podium"></div>
           </div>
         </div>
         <div class="tv-ex-right">
@@ -3435,19 +3433,13 @@ function openTvExibicao() {
             </div>
             <div class="tv-ex-chart-wrap"><canvas id="tv-ex-ano-chart"></canvas></div>
           </div>
+          <div class="tv-ex-santolin-bar" id="tv-ex-santolin-qtd"></div>
           <div class="tv-ex-card">
             <div class="chart-top">
               <span class="chart-title">Clientes por nível</span>
               <span class="chart-badge" id="tv-ex-nivel-badge">—</span>
             </div>
             <div class="tv-ex-chart-wrap"><canvas id="tv-ex-nivel-chart"></canvas></div>
-          </div>
-          <div class="tv-ex-card">
-            <div class="chart-top">
-              <span class="chart-title">Top 3 vendedores — Santolin 360</span>
-              <span class="chart-badge" id="tv-ex-rank-badge">—</span>
-            </div>
-            <div id="tv-ex-rank-list"></div>
           </div>
         </div>
       </div>`;
@@ -3468,59 +3460,57 @@ function closeTvExibicao() {
 
 function renderTvExibicao() {
   renderTvExMetaNovos();
-  renderTvExComissaoVendedores();
+  renderTvExSantolinMetas();
+  renderTvExSantolinPodium();
   renderTvExAnoChart();
   renderTvExNivelChart();
-  renderTvExRanking();
 }
 
-// Comissão gerada por vendedor no mês corrente — só tipo de negócio N (negócio
-// novo, sem contar endosso novo) e ramos elegíveis à meta via classifyRamo,
-// agrupada por colaborador.
-function buildTvComissaoVendedores() {
-  const now = today();
-  const y = now.getFullYear(), mIdx = now.getMonth();
-  const pad = n => String(n).padStart(2, '0');
-  const lastDay = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
-  const curStart = `${y}-${pad(mIdx + 1)}-01`, curEnd = `${y}-${pad(mIdx + 1)}-${pad(lastDay(y, mIdx))}`;
-  const map = {};
-  tvBaseRows().forEach(r => {
-    if (r.tipo !== 'N') return;
-    if (classifyRamo(r.ramo) === 'excluded') return;
-    const ds = fmtD(r.vig);
-    if (!ds || ds < curStart || ds > curEnd) return;
-    const k = r.colab || 'Sem identificação';
-    map[k] = (map[k] || 0) + r.com;
-  });
-  return { curStart, rows: Object.entries(map).map(([nome, com]) => ({ nome, com })).sort((a, b) => b.com - a.com) };
+// Barras de meta da campanha SANTOLIN 360 (mesmo widget da aba Cross-sell,
+// renderTierGoal), excluindo Celso/Denise igual ao resto da campanha nesta
+// tela. "Apólices vendidas" fica entre carteira acumulada e clientes por
+// nível (lado direito); "Comissão gerada" fica entre meta mensal e o pódio
+// (lado esquerdo).
+function renderTvExSantolinMetas() {
+  const qtdWrap = document.getElementById('tv-ex-santolin-qtd');
+  const comWrap = document.getElementById('tv-ex-santolin-com');
+  if (!qtdWrap || !comWrap) return;
+  const rows = getCampanha360Rows().filter(r => !tvColabExcluido(r.colab));
+  const qtd = rows.length;
+  const comissao = rows.reduce((s, r) => s + r.com, 0);
+  qtdWrap.innerHTML = renderTierGoal('Apólices vendidas', qtd, CAMPANHA_360_FASES_QTD, fN);
+  comWrap.innerHTML = renderTierGoal('Comissão gerada', comissao, CAMPANHA_360_FASES_COM, fBRL);
 }
 
-// Cabe sem rolagem numa tela de TV — corta no que couber confortavelmente em vez
-// de listar todo mundo (a lista já vem ordenada, então quem fica de fora é sempre
-// quem gerou menos comissão no mês).
-const TV_COM_LIST_MAX = 8;
-
-function renderTvExComissaoVendedores() {
-  const list = document.getElementById('tv-ex-com-list');
-  if (!list) return;
-  const { curStart, rows: allRows } = buildTvComissaoVendedores();
-  const rows = allRows.slice(0, TV_COM_LIST_MAX);
-  const ML = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const [y, m] = curStart.split('-');
-  document.getElementById('tv-ex-com-badge').textContent = ML[+m - 1] + '/' + y;
+// Pódio Top 3 — Santolin 360 (apólices vendidas e comissão gerada), mesmo
+// widget da aba Cross-sell (getCampanha360Rows + getCampanha360Ranking +
+// renderPodium), só excluindo Celso/Denise como o resto do lado esquerdo.
+function renderTvExSantolinPodium() {
+  const wrap = document.getElementById('tv-ex-santolin-podium');
+  if (!wrap) return;
+  document.getElementById('tv-ex-santolin-badge').textContent = CAMPANHA_360_NOME;
+  const rows = getCampanha360Rows().filter(r => !tvColabExcluido(r.colab));
   if (!rows.length) {
-    list.innerHTML = '<div class="tv-ex-rank-empty">Nenhuma comissão gerada neste mês ainda.</div>';
+    wrap.innerHTML = '<div class="tv-ex-podium-empty">Nenhuma apólice da campanha Santolin 360 ainda.</div>';
     return;
   }
-  const medalCls = ['gold', 'silver', 'bronze'];
-  list.innerHTML = rows.map((r, i) => {
-    const shortName = r.nome.split(' - ')[0].split('|')[0].trim();
-    return `<div class="tv-ex-com-row">
-      <span class="tv-ex-com-idx ${medalCls[i] || ''}">${i + 1}</span>
-      <span class="tv-ex-com-name">${shortName}</span>
-      <span class="tv-ex-com-value">${fBRL(r.com)}</span>
+  // Nome curto (primeiro nome + inicial do sobrenome) só pra exibição na TV —
+  // não mexe em renderPodium/getCampanha360Ranking, usados também na aba Cross-sell.
+  const shortName = nome => {
+    const partes = nome.trim().split(/\s+/);
+    return partes.length < 2 ? partes[0] : `${partes[0]} ${partes[1][0]}.`;
+  };
+  const rankQtd = getCampanha360Ranking(rows, 'qtd').map(r => ({ ...r, colab: shortName(r.colab) }));
+  const rankCom = getCampanha360Ranking(rows, 'comissao').map(r => ({ ...r, colab: shortName(r.colab) }));
+  wrap.innerHTML = `
+    <div class="podium-col">
+      <div class="podium-title">Top 3 — Apólices vendidas</div>
+      ${renderPodium(rankQtd)}
+    </div>
+    <div class="podium-col">
+      <div class="podium-title">Top 3 — Comissão gerada</div>
+      ${renderPodium(rankCom)}
     </div>`;
-  }).join('');
 }
 
 // ── Lado esquerdo: meta mensal de seguros novos ─────────────────────────────
@@ -3590,43 +3580,92 @@ function renderTvExMetaNovos() {
   body.innerHTML = row('premio', 'Prêmio') + row('comissao', 'Comissão');
 }
 
-// Todos os clientes (PF + PJ), de qualquer colaborador (carteira acumulada e
-// clientes por nível não excluem Celso/Denise — só o ranking e os cards da
-// esquerda excluem) — mesma lógica de agregação da aba Cross-sell (buildCrossMap).
+// Duração mínima (em dias) pra uma apólice contar como parte da carteira nos
+// gráficos da Exibição TV (carteira acumulada e clientes por nível) — ~12
+// meses, com folga de 15 dias pra não excluir uma anual normal (sempre fecha
+// em 364/365 dias). Abaixo disso é seguro temporário/acessório (viagem, carta
+// verde e similares). Não filtra pelo nome do ramo porque a duração já pega
+// viagem/carta verde e qualquer outro produto de curta duração junto.
+const TV_CARTEIRA_MIN_DIAS = 350;
+const tvDuracaoOk = r => !r.fim || (r.fim - r.vig) / 86400000 >= TV_CARTEIRA_MIN_DIAS;
+
+// Todos os clientes (PF + PJ), de qualquer colaborador (clientes por nível não
+// exclui Celso/Denise — só o ranking e os cards da esquerda excluem) — mesma
+// lógica de agregação da aba Cross-sell (buildCrossMap), já descontando os
+// seguros temporários/acessórios (tvDuracaoOk).
 function tvExClientes() {
   const map = new Map();
   ALL.forEach(r => {
     if (!r.docDigits) return;
     let c = map.get(r.docDigits);
     if (!c) { c = { doc: r.docDigits, apolicesAtivas: 0, primeiraVig: null }; map.set(r.docDigits, c); }
-    if (r.sit === 'Ativa' && r.tipoDoc === 'APÓLICE') c.apolicesAtivas++;
+    if (r.sit === 'Ativa' && r.tipoDoc === 'APÓLICE' && tvDuracaoOk(r)) c.apolicesAtivas++;
     if (r.vig && (!c.primeiraVig || r.vig < c.primeiraVig)) c.primeiraVig = r.vig;
   });
   return [...map.values()];
 }
 
-// Carteira acumulada por ano: para cada apólice ativa hoje, usa o ano da PRIMEIRA
-// vigência do cliente como "ano de entrada" — a data de vigência sozinha se renova
-// a cada ano e esconderia o histórico de quando o cliente entrou na carteira. O
-// valor de cada ano é a soma corrida (acumulada) até ali.
+// Carteira acumulada por ano: retrato por data, não pelo status de hoje, para
+// os anos já fechados. Para cada ano Y anterior ao corrente, conta quantas
+// apólices já tinham vigência iniciada e ainda não tinham terminado/sido
+// canceladas até 31/12 daquele ano. Usa r.fim (término de vigência) e
+// r.cancel (data de cancelamento) — não r.sit — porque o status atual só
+// reflete o presente: uma apólice de anos atrás que já renovou várias vezes
+// hoje aparece como "Renovada"/"Vencida", mas estava genuinamente em vigor
+// naquele ano. Isso também evita contar a mesma apólice em vários anos (cada
+// renovação é uma linha com sua própria janela vig→fim, sem sobreposição).
+//
+// O ano corrente é diferente: como ainda está em andamento, não faz sentido
+// aplicar o mesmo "retrato" (contaria apólices de anos passados que ainda não
+// venceram, mas que também ainda não sabemos se serão renovadas). Em vez
+// disso, conta só as apólices ATIVAS hoje cuja vigência começou dentro do
+// próprio ano corrente (a partir de 01/01).
 function buildTvAnoCarteira() {
-  const byYear = {};
-  tvExClientes().forEach(c => {
-    if (!c.primeiraVig || !c.apolicesAtivas) return;
-    const y = c.primeiraVig.getFullYear();
-    byYear[y] = (byYear[y] || 0) + c.apolicesAtivas;
-  });
-  const years = Object.keys(byYear).map(Number);
-  if (!years.length) return { labels: [], data: [] };
-  const minY = Math.min(...years), maxY = today().getFullYear();
+  const rows = ALL
+    .filter(r => r.tipoDoc === 'APÓLICE' && r.vig && tvDuracaoOk(r))
+    .map(r => ({ vig: r.vig, fim: (r.sit === 'Cancelada' && r.cancel) ? r.cancel : r.fim, sit: r.sit }));
+  if (!rows.length) return { labels: [], data: [] };
+  const minY = Math.min(...rows.map(r => r.vig.getFullYear()));
+  const maxY = today().getFullYear();
+  const jan1CurYear = new Date(maxY, 0, 1);
   const labels = [], data = [];
-  let running = 0;
   for (let y = minY; y <= maxY; y++) {
-    running += byYear[y] || 0;
+    let count;
+    if (y === maxY) {
+      count = rows.filter(r => r.sit === 'Ativa' && r.vig >= jan1CurYear).length;
+    } else {
+      const checkpoint = new Date(y, 11, 31);
+      count = rows.filter(r => r.vig <= checkpoint && (!r.fim || r.fim >= checkpoint)).length;
+    }
     labels.push(String(y));
-    data.push(running);
+    data.push(count);
   }
   return { labels, data };
+}
+
+// Rótulo com o valor acima de cada barra do dataset indicado (só a barra, não
+// a linha de tendência sobreposta — senão o rótulo desenharia duas vezes).
+function tvBarValueLabelPlugin(datasetIndex) {
+  return {
+    id: 'tvBarValueLabel',
+    afterDatasetsDraw(chart) {
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (!meta || meta.hidden) return;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.font = '700 12px Inter, system-ui, sans-serif';
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = labelClr();
+      const ds = chart.data.datasets[datasetIndex];
+      meta.data.forEach((el, i) => {
+        const v = ds.data[i];
+        if (v == null) return;
+        ctx.fillText(fN(v), el.x, el.y - 6);
+      });
+      ctx.restore();
+    },
+  };
 }
 
 function renderTvExAnoChart() {
@@ -3639,17 +3678,19 @@ function renderTvExAnoChart() {
       labels,
       datasets: [
         { type: 'bar', label: 'Apólices', data, backgroundColor: '#4E80FF', borderRadius: 4, order: 2 },
-        { type: 'line', label: 'Tendência', data, borderColor: '#22D3EE', borderWidth: 3, pointRadius: 0, tension: .3, fill: false, order: 1 },
+        { type: 'line', label: 'Tendência', data, borderColor: 'rgb(238 34 34 / 0.95)', borderWidth: 3, pointRadius: 0, tension: .3, fill: false, order: 1 },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' apólices' } } },
       scales: {
         x: { ticks: { color: lc, font: { size: 12 } }, grid: { display: false } },
         y: { beginAtZero: true, ticks: { color: ac, font: { size: 11 }, precision: 0 }, grid: { color: gc } },
       },
     },
+    plugins: [tvBarValueLabelPlugin(0)],
   });
 }
 
@@ -3678,6 +3719,7 @@ function renderTvExNivelChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' clientes (' + fP(total ? ctx.raw / total : 0) + ')' } },
@@ -3687,37 +3729,7 @@ function renderTvExNivelChart() {
         y: { beginAtZero: true, ticks: { color: ac, font: { size: 11 }, precision: 0 }, grid: { color: gc } },
       },
     },
+    plugins: [tvBarValueLabelPlugin(0)],
   });
 }
 
-// Ranking da campanha SANTOLIN 360 — top 3 vendedores por quantidade de apólices
-// fechadas (reaproveita getCampanha360Rows: campo CAMPANHA = "Santolin 360",
-// só apólices e dentro do período da campanha), com o prêmio líquido somado ao lado.
-function buildTvRankingVendedores() {
-  const map = {};
-  getCampanha360Rows().filter(r => !tvColabExcluido(r.colab)).forEach(r => {
-    const k = r.colab || 'Sem identificação';
-    if (!map[k]) map[k] = { nome: k, qtd: 0, premio: 0 };
-    map[k].qtd++; map[k].premio += r.premio;
-  });
-  return Object.values(map).sort((a, b) => b.qtd - a.qtd).slice(0, 3);
-}
-
-function renderTvExRanking() {
-  const rows = buildTvRankingVendedores();
-  document.getElementById('tv-ex-rank-badge').textContent = CAMPANHA_360_NOME;
-  const list = document.getElementById('tv-ex-rank-list');
-  if (!rows.length) {
-    list.innerHTML = '<div class="tv-ex-rank-empty">Nenhuma apólice da campanha Santolin 360 ainda.</div>';
-    return;
-  }
-  list.innerHTML = rows.map((r, i) => {
-    const shortName = r.nome.split(' - ')[0].split('|')[0].trim();
-    return `<div class="tv-ex-rank-row">
-      <span class="rank-badge ${i === 0 ? 'r1' : i === 1 ? 'r2' : 'r3'}">${i + 1}</span>
-      <span class="tv-ex-rank-name">${shortName}</span>
-      <span class="tv-ex-rank-qtd">${fN(r.qtd)} apólices</span>
-      <span class="tv-ex-rank-premio">${fBRL(r.premio)}</span>
-    </div>`;
-  }).join('');
-}

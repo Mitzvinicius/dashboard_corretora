@@ -2830,58 +2830,44 @@ body.tv-mode .metas-inputs-bar {
   justify-content: center;
   gap: 24px;
 }
-.msem-row.tv-ex-novos-row { grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.tv-ex-novos-body .msem-row-lbl { font-size: 14px; margin-top: 4px; margin-bottom: 2px; }
-.tv-ex-novos-body .msem-card { padding: 14px 16px; border-left-width: 4px; }
-.tv-ex-novos-body .msem-card-head { font-size: 13px; gap: 7px; }
-.tv-ex-novos-body .msem-dot { width: 10px; height: 10px; }
-.tv-ex-novos-body .msem-pct { font-size: 28px; margin: 7px 0 10px; }
-.tv-ex-novos-body .msem-bar { height: 8px; border-radius: 4px; }
-.tv-ex-novos-body .msem-nums { font-size: 14px; margin-top: 10px; }
-.tv-ex-novos-body .msem-gap { font-size: 12px; margin-top: 4px; }
+.msem-row.tv-ex-novos-row { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.tv-ex-novos-body .msem-row-lbl { font-size: 13px; margin-top: 6px; margin-bottom: 2px; }
+.tv-ex-novos-body .msem-card { padding: 10px 13px; border-left-width: 3px; }
+.tv-ex-novos-body .msem-card-head { font-size: 11px; gap: 6px; }
+.tv-ex-novos-body .msem-dot { width: 8px; height: 8px; }
+.tv-ex-novos-body .msem-pct { font-size: 22px; margin: 5px 0 8px; }
+.tv-ex-novos-body .msem-bar { height: 6px; border-radius: 3px; }
+.tv-ex-novos-body .msem-nums { font-size: 12px; margin-top: 8px; }
+.tv-ex-novos-body .msem-gap { font-size: 10.5px; margin-top: 3px; }
 
-#tv-ex-com-list {
+.tv-ex-santolin-podium.podium-grid {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  align-content: center;
+  gap: 40px;
 }
-.tv-ex-com-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 11px 4px;
-  border-bottom: 1px solid var(--border-subtle);
+.tv-ex-santolin-podium .podium-title { font-size: 15px; margin-bottom: 20px; }
+.tv-ex-santolin-podium .podium { gap: 20px; }
+.tv-ex-santolin-podium .podium-step { max-width: 96px; }
+.tv-ex-santolin-podium .podium-name { font-size: 14px; }
+.tv-ex-santolin-podium .rank-badge { width: 30px; height: 30px; font-size: 13px; }
+.tv-ex-santolin-podium .podium-p1 .podium-block { height: 120px; }
+.tv-ex-santolin-podium .podium-p2 .podium-block { height: 86px; }
+.tv-ex-santolin-podium .podium-p3 .podium-block { height: 58px; }
+.tv-ex-santolin-bar {
+  flex: 0 0 auto;
+  padding: 0 24px;
 }
-.tv-ex-com-idx {
-  width: 24px;
-  flex-shrink: 0;
-  font-size: 13px;
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-.tv-ex-com-idx.gold { color: #E8B94D; font-size: 17px; font-weight: 800; }
-.tv-ex-com-idx.silver { color: #C7CCD6; font-size: 16px; font-weight: 800; }
-.tv-ex-com-idx.bronze { color: #C08552; font-size: 16px; font-weight: 800; }
-.tv-ex-com-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tv-ex-com-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--k-green);
-  white-space: nowrap;
-}
+.tv-ex-santolin-bar .tier-goal { min-height: 0; }
+.tv-ex-santolin-bar .tier-goal-title { font-size: 14px; }
+.tv-ex-santolin-bar .tier-goal-value { font-size: 17px; }
+.tv-ex-santolin-bar .tier-goal-meta { font-size: 13px; }
+.tv-ex-santolin-bar .tier-goal-track { height: 18px; margin-top: 34px; }
+.tv-ex-santolin-bar .tier-marker span { font-size: 10px; top: -28px; }
+.tv-ex-santolin-bar .tier-goal-badge { font-size: 12px; }
 .tv-ex-right {
   min-width: 0;
   display: flex;
@@ -2891,6 +2877,7 @@ body.tv-mode .metas-inputs-bar {
 .tv-ex-card {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--bg-raised);
@@ -2904,34 +2891,7 @@ body.tv-mode .metas-inputs-bar {
 .tv-ex-card .chart-badge { font-size: 13px; padding: 3px 10px; }
 .tv-ex-chart-wrap { flex: 1; min-height: 0; position: relative; }
 
-#tv-ex-rank-list {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 14px;
-}
-.tv-ex-rank-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 4px;
-}
-.tv-ex-rank-row .rank-badge { width: 34px; height: 34px; font-size: 15px; }
-.tv-ex-rank-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tv-ex-rank-qtd { font-size: 15px; color: var(--text-secondary); white-space: nowrap; }
-.tv-ex-rank-premio { font-size: 17px; font-weight: 700; color: var(--accent); white-space: nowrap; min-width: 110px; text-align: right; }
-.tv-ex-rank-empty { margin: auto; color: var(--text-tertiary); font-size: 14px; }
+.tv-ex-podium-empty { margin: auto; color: var(--text-tertiary); font-size: 14px; }
 
 @media (max-width: 900px) {
   .tv-ex-grid { grid-template-columns: 1fr; }
