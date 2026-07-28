@@ -2797,7 +2797,7 @@ body.tv-mode .metas-inputs-bar {
   z-index: 9999;
   display: none;
   background: var(--bg-base);
-  padding: 3vh 2.5vw;
+  padding: 1vh 1.2vw;
 }
 .tv-ex-exit {
   position: absolute;
@@ -2828,7 +2828,7 @@ body.tv-mode .metas-inputs-bar {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 24px;
+  gap: 16px;
 }
 .msem-row.tv-ex-novos-row { grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .tv-ex-novos-body .msem-row-lbl { font-size: 13px; margin-top: 6px; margin-bottom: 2px; }
@@ -2883,10 +2883,10 @@ body.tv-mode .metas-inputs-bar {
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-lg);
-  padding: 20px 24px;
+  padding: 16px 16px;
   box-shadow: var(--shadow-card);
 }
-.tv-ex-card .chart-top { margin-bottom: 18px; }
+.tv-ex-card .chart-top { margin-bottom: 12px; }
 .tv-ex-card .chart-title { font-size: 18px; }
 .tv-ex-card .chart-badge { font-size: 13px; padding: 3px 10px; }
 .tv-ex-chart-wrap { flex: 1; min-height: 0; position: relative; }
