@@ -623,7 +623,40 @@
         </div>
       </div>
 
+      <!-- Comparativo por seguradora e ramo -->
+      <div class="section-card" id="sc-comp-pivot">
+        <div class="section-header open" onclick="toggleSection('comp-pivot')">
+          <span class="section-title">Comparativo por seguradora e ramo</span>
+          <div class="section-controls" onclick="event.stopPropagation()">
+            <div class="metric-toggle">
+              <input type="radio" name="mt-comp-pivot" id="mt-comp-pivot-p" value="premio" checked
+                onchange="renderCompPivotTable()">
+              <label for="mt-comp-pivot-p">Prêmio líquido</label>
+              <input type="radio" name="mt-comp-pivot" id="mt-comp-pivot-c" value="comissao"
+                onchange="renderCompPivotTable()">
+              <label for="mt-comp-pivot-c">Comissão</label>
+            </div>
+            <button class="btn-sm" style="font-size:11px" onclick="openCompPivotExportModal()">&#8593; Exportar</button>
+            <button class="collapse-btn" id="cb-comp-pivot">−</button>
+          </div>
+        </div>
+        <div class="section-body" id="sb-comp-pivot">
+          <div class="ret-table-wrap" id="comp-pivot-wrap"></div>
+        </div>
+      </div>
+
     </div><!-- /tab-comparativo -->
+
+    <!-- Modal de exportação — Comparativo por seguradora e ramo -->
+    <div class="export-modal-overlay" id="comp-pivot-export-modal" style="display:none"
+      onclick="if(event.target===this) closeCompPivotExportModal()">
+      <div class="export-modal-card">
+        <div class="export-modal-title">Exportar tabela</div>
+        <button class="export-modal-option" onclick="exportCompPivotAs('xlsx')">&#128202; Excel (.xlsx)</button>
+        <button class="export-modal-option" onclick="exportCompPivotAs('pdf')">&#128196; PDF</button>
+        <button class="export-modal-cancel" onclick="closeCompPivotExportModal()">Cancelar</button>
+      </div>
+    </div>
 
     <!-- TAB METAS -->
     <div class="tab-pane" id="tab-metas">

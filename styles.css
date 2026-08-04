@@ -2902,3 +2902,87 @@ body.tv-mode .metas-inputs-bar {
   .kf-teams { grid-template-columns: 1fr; gap: 12px; }
   .kf-team-pct { font-size: 44px; }
 }
+
+/* ══════════════════════════════════════════
+   COMPARATIVO — tabela por seguradora/ramo
+   ══════════════════════════════════════════ */
+
+.comp-pivot-total td {
+  font-weight: 700;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.comp-pivot-sub td:first-child {
+  padding-left: 28px;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* ══════════════════════════════════════════
+   MODAL DE EXPORTAÇÃO (genérico, primeiro modal
+   centralizado do projeto — reaproveitável)
+   ══════════════════════════════════════════ */
+
+.export-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.export-modal-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-dropdown);
+  padding: 20px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.export-modal-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.export-modal-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+.export-modal-option:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.export-modal-cancel {
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.export-modal-cancel:hover {
+  color: var(--text-primary);
+}

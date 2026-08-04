@@ -24,7 +24,7 @@ const RET_MS = { col: new Set(), ram: new Set(), grp: new Set(), mot: new Set() 
 let retActiveTipos = new Set();
 let retDetailFilter = '';
 let retSortKey = 'pctQtd', retSortDir = 'desc';
-const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
+const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'comp-pivot': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
 let metaSortKey = 'totalAnt', metaSortDir = 'desc';
 let metaWeekTeam = 'geral';    // geral | pessoais | patrimoniais
 let metaWeekMetric = 'premio'; // premio | comissao
@@ -2254,6 +2254,145 @@ function renderCompTab() {
 
   if (sectionState['comp-chart']) renderCompChart(dataAtual, dataPrev, start, end, prev.start, prev.end);
   if (sectionState['comp-kpis']) renderCompKPIs(dataAtual, dataPrev);
+  if (sectionState['comp-pivot']) renderCompPivotTable();
+}
+
+// ── Comparativo por seguradora e ramo ───────────────────────────────────────────
+// Ao contrário do gráfico/KPIs acima (que usam o período próprio da aba), esta
+// tabela usa FD — o mesmo dado já filtrado por TODOS os filtros macro do topo
+// (vigência, emissão, colaborador, grupo, ramo, seguradora, tipo) — por isso os
+// números podem divergir do restante da aba quando os dois filtros não coincidem.
+function getCompPivotData(metricField) {
+  const years = [...new Set(FD.filter(r => r.vig).map(r => r.vig.getFullYear()))].sort((a, b) => a - b);
+  const seguradoras = new Map(); // seg -> { total: Map<ano,val>, ramos: Map<ramo, Map<ano,val>> }
+  const totalGeral = new Map(); // ano -> val
+
+  FD.forEach(r => {
+    if (!r.vig) return;
+    const ano = r.vig.getFullYear();
+    const val = r[metricField] || 0;
+    const seg = r.seg || 'Sem seguradora';
+    const ramo = r.ramo || 'Sem ramo';
+    if (!seguradoras.has(seg)) seguradoras.set(seg, { total: new Map(), ramos: new Map() });
+    const s = seguradoras.get(seg);
+    s.total.set(ano, (s.total.get(ano) || 0) + val);
+    if (!s.ramos.has(ramo)) s.ramos.set(ramo, new Map());
+    const rMap = s.ramos.get(ramo);
+    rMap.set(ano, (rMap.get(ano) || 0) + val);
+    totalGeral.set(ano, (totalGeral.get(ano) || 0) + val);
+  });
+
+  const somaAnos = m => [...m.values()].reduce((a, b) => a + b, 0);
+  const seguradorasList = [...seguradoras.entries()].map(([nome, s]) => ({
+    nome,
+    valores: s.total,
+    total: somaAnos(s.total),
+    ramos: [...s.ramos.entries()]
+      .map(([ramoNome, ramoMap]) => ({ nome: ramoNome, valores: ramoMap, total: somaAnos(ramoMap) }))
+      .sort((a, b) => b.total - a.total)
+  })).sort((a, b) => b.total - a.total);
+
+  return { years, seguradoras: seguradorasList, totalGeral };
+}
+
+function renderCompPivotTable() {
+  const wrap = document.getElementById('comp-pivot-wrap');
+  if (!wrap) return;
+  const metric = getMetric('mt-comp-pivot') === 'comissao' ? 'com' : 'premio';
+  const { years, seguradoras, totalGeral } = getCompPivotData(metric);
+
+  if (!years.length || !seguradoras.length) {
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px">Nenhum dado para o filtro atual.</div>';
+    return;
+  }
+
+  const pct = (val, ano) => { const t = totalGeral.get(ano) || 0; return t > 0 ? val / t : 0; };
+  const rowCells = valoresMap => years.map(y => {
+    const v = valoresMap.get(y) || 0;
+    return `<td class="num" style="border-left:1px solid var(--border-subtle)">${fBRL(v)}</td><td class="num">${fP(pct(v, y))}</td>`;
+  }).join('');
+
+  const thead = `<thead>
+    <tr>
+      <th rowspan="2" style="text-align:left;vertical-align:bottom">Seguradora / Ramo</th>
+      ${years.map(y => `<th colspan="2" style="text-align:center;border-left:1px solid var(--border-subtle)">${y}</th>`).join('')}
+    </tr>
+    <tr>
+      ${years.map(() => `<th class="num" style="border-left:1px solid var(--border-subtle)">Valor</th><th class="num">%</th>`).join('')}
+    </tr>
+  </thead>`;
+
+  const tbody = seguradoras.map(seg => {
+    const totalRow = `<tr class="comp-pivot-total"><td>${seg.nome}</td>${rowCells(seg.valores)}</tr>`;
+    const ramoRows = seg.ramos.map(r => `<tr class="comp-pivot-sub"><td>${r.nome}</td>${rowCells(r.valores)}</tr>`).join('');
+    return totalRow + ramoRows;
+  }).join('');
+
+  const tfoot = `<tfoot><tr><td>Total geral</td>${rowCells(totalGeral)}</tr></tfoot>`;
+
+  wrap.innerHTML = `<table class="ret-table" id="comp-pivot-table">${thead}<tbody>${tbody}</tbody>${tfoot}</table>`;
+}
+
+function compPivotExportEscHandler(e) { if (e.key === 'Escape') closeCompPivotExportModal(); }
+
+function openCompPivotExportModal() {
+  document.getElementById('comp-pivot-export-modal').style.display = 'flex';
+  document.addEventListener('keydown', compPivotExportEscHandler);
+}
+
+function closeCompPivotExportModal() {
+  document.getElementById('comp-pivot-export-modal').style.display = 'none';
+  document.removeEventListener('keydown', compPivotExportEscHandler);
+}
+
+function exportCompPivotAs(format) {
+  closeCompPivotExportModal();
+  const metric = getMetric('mt-comp-pivot') === 'comissao' ? 'com' : 'premio';
+  const { years, seguradoras, totalGeral } = getCompPivotData(metric);
+  if (!years.length || !seguradoras.length) { alert('Não há dados para exportar com o filtro atual.'); return; }
+
+  if (format === 'xlsx') {
+    const rows = [];
+    seguradoras.forEach(seg => {
+      const totalRow = { 'Seguradora': seg.nome, 'Ramo': '' };
+      years.forEach(y => {
+        const v = seg.valores.get(y) || 0, t = totalGeral.get(y) || 0;
+        totalRow[String(y)] = v;
+        totalRow[y + ' %'] = t > 0 ? v / t : 0;
+      });
+      rows.push(totalRow);
+      seg.ramos.forEach(r => {
+        const row = { 'Seguradora': '', 'Ramo': r.nome };
+        years.forEach(y => {
+          const v = r.valores.get(y) || 0, t = totalGeral.get(y) || 0;
+          row[String(y)] = v;
+          row[y + ' %'] = t > 0 ? v / t : 0;
+        });
+        rows.push(row);
+      });
+    });
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Comparativo');
+    XLSX.writeFile(workbook, 'Comparativo_Seguradora_Ramo.xlsx');
+  } else if (format === 'pdf') {
+    exportCompPivotPdf();
+  }
+}
+
+async function exportCompPivotPdf() {
+  const el = document.getElementById('comp-pivot-wrap');
+  if (!el || !window.html2canvas || !window.jspdf) return;
+  const canvas = await window.html2canvas(el, {
+    scale: 2, backgroundColor: '#0b0f18', useCORS: true,
+    width: el.scrollWidth, height: el.scrollHeight,
+    windowWidth: el.scrollWidth, windowHeight: el.scrollHeight
+  });
+  const { jsPDF } = window.jspdf;
+  const imgW = canvas.width, imgH = canvas.height;
+  const pdf = new jsPDF({ orientation: imgW >= imgH ? 'landscape' : 'portrait', unit: 'px', format: [imgW, imgH] });
+  pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, imgW, imgH);
+  pdf.save('Comparativo_Seguradora_Ramo.pdf');
 }
 
 function renderCompChart(dataAtual, dataPrev, startA, endA, startP, endP) {
@@ -3478,8 +3617,8 @@ function renderTvExSantolinMetas() {
   const rows = getCampanha360Rows().filter(r => !tvColabExcluido(r.colab));
   const qtd = rows.length;
   const comissao = rows.reduce((s, r) => s + r.com, 0);
-  qtdWrap.innerHTML = renderTierGoal('Apólices vendidas', qtd, CAMPANHA_360_FASES_QTD, fN);
-  comWrap.innerHTML = renderTierGoal('Comissão gerada', comissao, CAMPANHA_360_FASES_COM, fBRL);
+  qtdWrap.innerHTML = renderTierGoal('Negócios Realizados', qtd, CAMPANHA_360_FASES_QTD, fN);
+  comWrap.innerHTML = renderTierGoal('Resultado Gerado', comissao, CAMPANHA_360_FASES_COM, fBRL);
 }
 
 // Pódio Top 3 — Santolin 360 (apólices vendidas e comissão gerada), mesmo
@@ -3504,11 +3643,11 @@ function renderTvExSantolinPodium() {
   const rankCom = getCampanha360Ranking(rows, 'comissao').map(r => ({ ...r, colab: shortName(r.colab) }));
   wrap.innerHTML = `
     <div class="podium-col">
-      <div class="podium-title">Top 3 — Apólices vendidas</div>
+      <div class="podium-title">Top 3 — Negócios Realizados</div>
       ${renderPodium(rankQtd)}
     </div>
     <div class="podium-col">
-      <div class="podium-title">Top 3 — Comissão gerada</div>
+      <div class="podium-title">Top 3 — Resultado Gerado</div>
       ${renderPodium(rankCom)}
     </div>`;
 }
