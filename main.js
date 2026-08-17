@@ -31,10 +31,84 @@ let metaWeekMetric = 'premio'; // premio | comissao
 // Classificação de ramos para a aba Metas.
 // normRamo: maiúsculas, sem acento, espaços colapsados — tolera variações de grafia da planilha.
 const normRamo = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+// Nomenclatura oficial de ramos adotada pela corretora. A base do Quiver ainda
+// traz uma minoria de apólices legadas com o nome antigo (a serem corrigidas no
+// próprio Quiver); aqui só unificamos variações de CAIXA/acento do mesmo ramo —
+// ex.: 'ODONTOLÓGICO - COLETIVO' e 'Odontológico - Coletivo' contam como um só.
+const RAMOS_OFICIAIS = [
+  'Acidentes Pessoais',
+  'Acidentes Pessoais - Coletivo',
+  'Automóvel - Casco',
+  'Carta Verde',
+  'Compreensivo Condomínio',
+  'Compreensivo Empresarial',
+  'Compreensivo Residencial',
+  'Educacional Individual',
+  'Eventos Aleatórios',
+  'Eventos Aleatórios - Coletivo',
+  'Garantia Segurado - Setor Público',
+  'Marítimos (Casco)',
+  'Microsseguros de Previdência',
+  // Único ramo ainda em caixa alta no Quiver. Quando migrarem, basta trocar por
+  // 'Odontológico - Coletivo' — as duas grafias já resolvem para o mesmo ramo.
+  'ODONTOLÓGICO - COLETIVO',
+  'Responsabilidade Civil de Administradores e Diretores - D&O',
+  'Responsabilidade Civil Facultativa Veículos - RCFV',
+  'Responsabilidade Civil Geral',
+  'Responsabilidade Civil Profissional',
+  'Riscos de Engenharia',
+  'Riscos Diversos',
+  'Saúde',
+  'Seguro Viagem Individual',
+  'Transporte Nacional',
+  'Vida',
+  'Vida em Grupo',
+  'Vida Individual',
+];
+const RAMO_CANON = new Map(RAMOS_OFICIAIS.map(r => [normRamo(r), r]));
+// Devolve o nome oficial quando o ramo bate por caixa/acento; senão preserva o
+// texto original (legado ou ainda não catalogado) para não mascarar a base.
+const canonRamo = ramo => RAMO_CANON.get(normRamo(ramo)) || String(ramo || '').trim();
+
 // Ramos que NÃO entram na contagem da meta (match por trecho normalizado).
-const META_EXCLUDED_KEYS = ['VIAGEM', 'CARTA VERDE', 'ACIDENTES PESSOAIS', 'PREVIDENCIA', 'EVENTOS ALEATORIOS', 'TRANSPORTE NACIONAL'];
+// 'VGBL' e 'EDUCACIONAL' entraram com a nomenclatura nova; 'PREVIDENCIA' cobre
+// 'Microsseguros de Previdência'.
+const META_EXCLUDED_KEYS = ['VIAGEM', 'CARTA VERDE', 'ACIDENTES PESSOAIS', 'PREVIDENCIA', 'VGBL',
+  'EVENTOS ALEATORIOS', 'TRANSPORTE NACIONAL', 'EDUCACIONAL'];
 // Ramos da equipe Pessoal; os demais não-excluídos caem em Patrimonial.
-const META_PESSOAIS_KEYS = ['VIDA', 'SAUDE', 'ODONTO', 'RC PROFISSIONAL', 'RC GERAL', 'RC ADMINISTRADORES', 'ADMINISTRADORES E DIRETORES', 'D&O'];
+// As chaves 'RC ...' cobrem as apólices legadas até o Quiver ser corrigido.
+const META_PESSOAIS_KEYS = ['VIDA', 'SAUDE', 'ODONTO',
+  'RESPONSABILIDADE CIVIL PROFISSIONAL', 'RESPONSABILIDADE CIVIL GERAL',
+  'ADMINISTRADORES E DIRETORES', 'D&O',
+  'RC PROFISSIONAL', 'RC GERAL', 'RC ADMINISTRADORES'];
+
+// Rótulos curtos para os eixos dos gráficos por ramo (chave = ramo normalizado).
+const RAMO_SHORT = {
+  'AUTOMOVEL - CASCO': 'Auto — casco',
+  'COMPREENSIVO RESIDENCIAL': 'Comp. residencial',
+  'COMPREENSIVO EMPRESARIAL': 'Comp. empresarial',
+  'COMPREENSIVO CONDOMINIO': 'Comp. condomínio',
+  'RESPONSABILIDADE CIVIL PROFISSIONAL': 'RC profissional',
+  'RESPONSABILIDADE CIVIL GERAL': 'RC geral',
+  'RESPONSABILIDADE CIVIL FACULTATIVA VEICULOS - RCFV': 'RCF veículos',
+  'RESPONSABILIDADE CIVIL DE ADMINISTRADORES E DIRETORES - D&O': 'RC D&O',
+  'GARANTIA SEGURADO - SETOR PUBLICO': 'Garantia setor púb.',
+  'MICROSSEGUROS DE PREVIDENCIA': 'Microsseg. previd.',
+  'ACIDENTES PESSOAIS - COLETIVO': 'Ac. pessoais colet.',
+  'EVENTOS ALEATORIOS - COLETIVO': 'Ev. aleatórios colet.',
+  'ODONTOLOGICO - COLETIVO': 'Odontológico colet.',
+  'SEGURO VIAGEM INDIVIDUAL': 'Viagem individual',
+  'TRANSPORTE NACIONAL': 'Transporte nac.',
+  'RISCOS DE ENGENHARIA': 'Riscos engenharia',
+  // Legados sem par oficial — só até o Quiver ser corrigido.
+  'RC PROFISSIONAL': 'RC profissional',
+  'RCF VEICULOS RCFV': 'RCF veículos',
+  'VGBL/VAGP/VRGP/VRSA/VRI': 'Previdência VGBL',
+};
+// Abrevia o ramo para os gráficos; sem entrada no mapa, devolve o nome oficial
+// em caixa de sentença.
+const shortRamo = n => RAMO_SHORT[normRamo(n)]
+  || String(n || '').toLowerCase().replace(/^\w/, c => c.toUpperCase());
 // → 'excluded' | 'pessoais' | 'patrimoniais'
 function classifyRamo(ramo) {
   const n = normRamo(ramo);
@@ -327,7 +401,7 @@ function parseProducaoArrayBuffer(buf) {
     return {
       tipo: String(r[COL.tipo] || '').trim(), vig: toDate(r[COL.vig]), em: toDate(r[COL.em]),
       fim: toDate(r[COL.fim]), cli: String(r[COL.cli] || ''), seg: String(r[COL.seg] || ''),
-      ramo: String(r[COL.ramo] || ''), grp: String(r[COL.grp] || ''),
+      ramo: canonRamo(r[COL.ramo]), grp: String(r[COL.grp] || ''),
       premio: parseFloat(r[COL.premio]) || 0, com: parseFloat(r[COL.com]) || 0,
       colab: String(r[COL.colab] || ''), sit: String(r[COL.sit] || ''),
       motivo: String(r[COL.motivo] || ''), cancel: toDate(r[COL.cancel]),
@@ -373,7 +447,7 @@ function parseClaimsArrayBuffer(buf) {
     encerra: toDate(r[COL_SIN.encerra]),
     status: String(r[COL_SIN.status] || '').trim(),
     seg: String(r[COL_SIN.seg] || '').trim(),
-    ramo: String(r[COL_SIN.ramo] || '').trim(),
+    ramo: canonRamo(r[COL_SIN.ramo]),
     cli: String(r[COL_SIN.cli] || '').trim(),
     valor: parseFloat(r[COL_SIN.valor]) || 0,
     pago: parseFloat(r[COL_SIN.pago]) || 0,
@@ -891,9 +965,8 @@ function renderRamo() {
   const field = getMetric('mt-ramo') === 'comissao' ? 'com' : 'premio';
   const byR = {}; FD.forEach(r => { if (r.ramo) byR[r.ramo] = (byR[r.ramo] || 0) + r[field]; });
   const sorted = Object.entries(byR).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const short = n => n.replace('AUTOMÓVEL - CASCO', 'Auto — casco').replace('COMPREENSIVO RESIDENCIAL', 'Comp. residencial').replace('COMPREENSIVO EMPRESARIAL', 'Comp. empresarial').replace('COMPREENSIVO CONDOMÍNIO', 'Comp. condomínio').replace('RC PROFISSIONAL', 'RC profissional').replace('VIDA INDIVIDUAL', 'Vida individual').replace('VIDA EM GRUPO', 'Vida em grupo').replace('TRANSPORTE NACIONAL', 'Transporte nac.').replace('RISCOS DIVERSOS', 'Riscos diversos').replace('RISCOS DE ENGENHARIA', 'Riscos engenharia').replace('OUTROS RAMOS', 'Outros ramos').toLowerCase().replace(/^\w/, c => c.toUpperCase());
   const ac = axisClr(), lc = labelClr(), gc = gridClr();
-  mkChart('ch-ramo', { type: 'bar', data: { labels: sorted.map(e => short(e[0])), datasets: [{ data: sorted.map(e => e[1]), backgroundColor: PALETA.slice(0, sorted.length), borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fBRL(ctx.raw) } } }, scales: { x: { ticks: { color: ac, font: { size: 10 }, callback: fShort }, grid: { color: gc } }, y: { ticks: { color: lc, font: { size: 11 } }, grid: { display: false } } } } });
+  mkChart('ch-ramo', { type: 'bar', data: { labels: sorted.map(e => shortRamo(e[0])), datasets: [{ data: sorted.map(e => e[1]), backgroundColor: PALETA.slice(0, sorted.length), borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fBRL(ctx.raw) } } }, scales: { x: { ticks: { color: ac, font: { size: 10 }, callback: fShort }, grid: { color: gc } }, y: { ticks: { color: lc, font: { size: 11 } }, grid: { display: false } } } } });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1489,8 +1562,8 @@ function renderCrossCampanha360() {
 // Cross-sell (match por trecho normalizado, mesmo critério de classifyRamo).
 // Demais ramos ficam disponíveis no filtro para o usuário ativar manualmente.
 const CROSS_MAIN_RAMOS = {
-  PF: ['VIDA INDIVIDUAL', 'RC PROFISSIONAL', 'AUTOMOVEL', 'RESIDENCIAL'],
-  PJ: ['SAUDE', 'VIDA EM GRUPO', 'EMPRESARIAL', 'RC PROFISSIONAL'],
+  PF: ['VIDA INDIVIDUAL', 'RESPONSABILIDADE CIVIL PROFISSIONAL', 'RC PROFISSIONAL', 'AUTOMOVEL', 'RESIDENCIAL'],
+  PJ: ['SAUDE', 'VIDA EM GRUPO', 'EMPRESARIAL', 'RESPONSABILIDADE CIVIL PROFISSIONAL', 'RC PROFISSIONAL'],
 };
 function isCrossMainRamo(ramo, pessoa) {
   const n = normRamo(ramo);
@@ -2136,7 +2209,6 @@ function renderRentabilidade() {
     return { k, premio, com, sin, qtd, rent: premio > 0 ? (premio - sin - com) / premio : null };
   }).sort((a, b) => (b.premio || 0) - (a.premio || 0));
   const shortSeg = n => n.replace(/ CIA DE SEGUROS GERAIS S\/A/g, '').replace(/ CIA NAC DE SEGUROS S\/A/g, '').replace(/ SEGUROS S\/A/g, '').replace(/ SEGURADORA S\/A/g, '').replace(/ SEGURADORA/g, '').replace(/ SEGS CORPORATIVOS SA/g, '').trim();
-  const shortRamo = n => n.replace('AUTOMÓVEL - CASCO', 'Auto — casco').replace('COMPREENSIVO RESIDENCIAL', 'Comp. residencial').replace('COMPREENSIVO EMPRESARIAL', 'Comp. empresarial').replace('COMPREENSIVO CONDOMÍNIO', 'Comp. condomínio').toLowerCase().replace(/^\w/, c => c.toUpperCase());
   const label = rentabilView === 'seg' ? 'Seguradora' : 'Ramo';
   const fmt = n => rentabilView === 'seg' ? shortSeg(n) : shortRamo(n);
   const rentBadge = pct => {
