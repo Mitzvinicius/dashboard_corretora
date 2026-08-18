@@ -93,6 +93,7 @@ chooseProd() / chooseSin()
 
 - **Base da meta** = mesmo período do filtro de vigência, porém **um ano antes**; meta = base × (1 + % de crescimento) para Novos/Renovações.
 - **Classificação de ramos:** `excluded` (não entram na meta), `pessoais`, `patrimoniais`.
+- **Nomenclatura de ramos:** a lista oficial fica em `RAMOS_OFICIAIS` (main.js). `canonRamo()` unifica variações de caixa/acento do mesmo ramo na leitura da planilha; nomes fora da lista são preservados como vieram. Fora da meta hoje: viagem, carta verde, acidentes pessoais, previdência (incl. VGBL), eventos aleatórios, transporte nacional e educacional.
 - **Acompanhamento semanal:** divide o período em semanas de calendário (domingo→sábado); a **Semana 1 sempre começa no dia 1** (fragmento inicial só é fundido na semana seguinte se tiver **≤3 dias**); a **última semana pode ser parcial**.
 - **Modo apresentação (kickoff):** ao abrir, oferece **Fechamento de mês** (consolida o mês anterior + evolução semanal por equipe + meta do mês atual) ou **Resultado por semana** (um botão por semana do mês filtrado). Slides por equipe: Pessoais, Patrimoniais e Geral, com gráficos Meta × Realizado.
 - Todas as comparações de data usam **início de vigência** (string `YYYY-MM-DD`), consistente entre as abas e evitando bug de fuso.

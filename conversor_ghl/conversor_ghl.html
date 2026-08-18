@@ -758,14 +758,19 @@
   </div>
 
   <script>
+    // Nomenclatura de ramos vigente. Espelha RAMOS_OFICIAIS do dashboard (main.js);
+    // ao incluir/renomear um ramo, atualizar os dois.
     const RAMOS_GHL = [
-      "ACIDENTES PESSOAIS COLETIVO", "ACIDENTES PESSOAIS INDIVIDUAL", "AUTOMÓVEL - CASCO",
-      "CAMINHÃO", "CARTA VERDE", "COMPREENSIVO CONDOMÍNIO", "COMPREENSIVO EMPRESARIAL",
-      "COMPREENSIVO RESIDENCIAL", "EVENTOS ALEATÓRIOS", "FROTA",
-      "GARANTIA SEGURADO - SETOR PÚBLICO", "MARÍTIMOS (CASCO)", "OUTROS RAMOS",
-      "PREVIDÊNCIA", "RC GERAL", "RC PROFISSIONAL", "RCF VEÍCULOS RCFV",
-      "RISCOS DE ENGENHARIA", "RISCOS DIVERSOS", "SAÚDE", "TRANSPORTE NACIONAL",
-      "VIDA EM GRUPO", "VIDA INDIVIDUAL", "VIAGEM"
+      "Acidentes Pessoais", "Acidentes Pessoais - Coletivo", "Automóvel - Casco",
+      "Caminhão", "Carta Verde", "Compreensivo Condomínio", "Compreensivo Empresarial",
+      "Compreensivo Residencial", "Educacional Individual", "Eventos Aleatórios",
+      "Eventos Aleatórios - Coletivo", "Frota", "Garantia Segurado - Setor Público",
+      "Marítimos (Casco)", "Microsseguros de Previdência", "ODONTOLÓGICO - COLETIVO",
+      "OUTROS RAMOS", "Responsabilidade Civil de Administradores e Diretores - D&O",
+      "Responsabilidade Civil Facultativa Veículos - RCFV", "Responsabilidade Civil Geral",
+      "Responsabilidade Civil Profissional", "Riscos de Engenharia", "Riscos Diversos",
+      "Saúde", "Seguro Viagem Individual", "Transporte Nacional",
+      "VGBL/VAGP/VRGP/VRSA/VRI", "Vida", "Vida em Grupo", "Vida Individual"
     ];
 
     const SEGS_GHL = [
@@ -807,31 +812,40 @@
     };
 
 
-    // Auto-map rules for ramos
+    // Auto-map rules for ramos — a primeira regra que casa vence, então as regras
+    // mais específicas vêm antes das genéricas (coletivo antes de individual etc.).
     const RAMO_RULES = [
-      [/rc\s*prof/i, "RC PROFISSIONAL"],
-      [/residencia|residencial/i, "COMPREENSIVO RESIDENCIAL"],
-      [/auto|casco|automov|automóv/i, "AUTOMÓVEL - CASCO"],
-      [/vida\s*ind/i, "VIDA INDIVIDUAL"],
-      [/vida\s*(em\s*)?gr|vg\s*-|vida\s*glob/i, "VIDA EM GRUPO"],
-      [/empresa|empresar/i, "COMPREENSIVO EMPRESARIAL"],
-      [/sa[uú]de/i, "SAÚDE"],
-      [/viagem/i, "VIAGEM"],
-      [/ac.*pes.*ind|ap\s*est/i, "ACIDENTES PESSOAIS INDIVIDUAL"],
-      [/eng/i, "RISCOS DE ENGENHARIA"],
-      [/condom/i, "COMPREENSIVO CONDOMÍNIO"],
-      [/transp/i, "TRANSPORTE NACIONAL"],
-      [/carta\s*verde/i, "CARTA VERDE"],
-      [/riscos\s*div/i, "RISCOS DIVERSOS"],
-      [/rc\s*ger/i, "RC GERAL"],
-      [/mar[íi]t/i, "MARÍTIMOS (CASCO)"],
-      [/caminh/i, "CAMINHÃO"],
-      [/previd/i, "PREVIDÊNCIA"],
-      [/ac.*pes.*col/i, "ACIDENTES PESSOAIS COLETIVO"],
-      [/frota/i, "FROTA"],
-      [/rcf|rcfv/i, "RCF VEÍCULOS RCFV"],
-      [/garantia/i, "GARANTIA SEGURADO - SETOR PÚBLICO"],
-      [/event/i, "EVENTOS ALEATÓRIOS"],
+      [/rc[\s-]*prof/i, "Responsabilidade Civil Profissional"],
+      [/residencia|residencial/i, "Compreensivo Residencial"],
+      // Só há ramo odontológico coletivo; 'ODONTO INDIVIDUAL' fica sem regra de
+      // propósito, para ser mapeado à mão.
+      [/odonto.*(emp|col)|odontolog/i, "ODONTOLÓGICO - COLETIVO"],
+      [/auto|casco|automov|automóv/i, "Automóvel - Casco"],
+      [/vida\s*ind/i, "Vida Individual"],
+      [/vida\s*(em\s*)?gr|vg\s*-|vida\s*glob/i, "Vida em Grupo"],
+      [/empresa|empresar/i, "Compreensivo Empresarial"],
+      [/sa[uú]de/i, "Saúde"],
+      [/viagem/i, "Seguro Viagem Individual"],
+      // 'AP ESTAGIARIO' cai em Educacional Individual (78% dos lançamentos da base);
+      // os demais APs individuais seguem em Acidentes Pessoais.
+      [/ap\s*est|educacional/i, "Educacional Individual"],
+      [/ac.*pes.*col|^apc|ap\s*col/i, "Acidentes Pessoais - Coletivo"],
+      [/ac.*pes|pessoais|^ap\b|^api/i, "Acidentes Pessoais"],
+      [/eng/i, "Riscos de Engenharia"],
+      [/condom/i, "Compreensivo Condomínio"],
+      [/transp/i, "Transporte Nacional"],
+      [/carta\s*verde/i, "Carta Verde"],
+      [/riscos\s*div/i, "Riscos Diversos"],
+      [/rc\s*-?\s*admin|administradores|d\s*&\s*o|e\s*&\s*o/i, "Responsabilidade Civil de Administradores e Diretores - D&O"],
+      [/rc\s*ger/i, "Responsabilidade Civil Geral"],
+      [/mar[íi]t|n[áa]utico/i, "Marítimos (Casco)"],
+      [/caminh/i, "Caminhão"],
+      [/previd/i, "VGBL/VAGP/VRGP/VRSA/VRI"],
+      [/frota/i, "Frota"],
+      [/rcf|rcfv/i, "Responsabilidade Civil Facultativa Veículos - RCFV"],
+      [/garantia/i, "Garantia Segurado - Setor Público"],
+      [/event.*col/i, "Eventos Aleatórios - Coletivo"],
+      [/event/i, "Eventos Aleatórios"],
     ];
 
     // Auto-map rules for seguradoras

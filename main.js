@@ -24,17 +24,91 @@ const RET_MS = { col: new Set(), ram: new Set(), grp: new Set(), mot: new Set() 
 let retActiveTipos = new Set();
 let retDetailFilter = '';
 let retSortKey = 'pctQtd', retSortDir = 'desc';
-const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
+const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'comp-pivot': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
 let metaSortKey = 'totalAnt', metaSortDir = 'desc';
 let metaWeekTeam = 'geral';    // geral | pessoais | patrimoniais
 let metaWeekMetric = 'premio'; // premio | comissao
 // Classificação de ramos para a aba Metas.
 // normRamo: maiúsculas, sem acento, espaços colapsados — tolera variações de grafia da planilha.
 const normRamo = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+// Nomenclatura oficial de ramos adotada pela corretora. A base do Quiver ainda
+// traz uma minoria de apólices legadas com o nome antigo (a serem corrigidas no
+// próprio Quiver); aqui só unificamos variações de CAIXA/acento do mesmo ramo —
+// ex.: 'ODONTOLÓGICO - COLETIVO' e 'Odontológico - Coletivo' contam como um só.
+const RAMOS_OFICIAIS = [
+  'Acidentes Pessoais',
+  'Acidentes Pessoais - Coletivo',
+  'Automóvel - Casco',
+  'Carta Verde',
+  'Compreensivo Condomínio',
+  'Compreensivo Empresarial',
+  'Compreensivo Residencial',
+  'Educacional Individual',
+  'Eventos Aleatórios',
+  'Eventos Aleatórios - Coletivo',
+  'Garantia Segurado - Setor Público',
+  'Marítimos (Casco)',
+  'Microsseguros de Previdência',
+  // Único ramo ainda em caixa alta no Quiver. Quando migrarem, basta trocar por
+  // 'Odontológico - Coletivo' — as duas grafias já resolvem para o mesmo ramo.
+  'ODONTOLÓGICO - COLETIVO',
+  'Responsabilidade Civil de Administradores e Diretores - D&O',
+  'Responsabilidade Civil Facultativa Veículos - RCFV',
+  'Responsabilidade Civil Geral',
+  'Responsabilidade Civil Profissional',
+  'Riscos de Engenharia',
+  'Riscos Diversos',
+  'Saúde',
+  'Seguro Viagem Individual',
+  'Transporte Nacional',
+  'Vida',
+  'Vida em Grupo',
+  'Vida Individual',
+];
+const RAMO_CANON = new Map(RAMOS_OFICIAIS.map(r => [normRamo(r), r]));
+// Devolve o nome oficial quando o ramo bate por caixa/acento; senão preserva o
+// texto original (legado ou ainda não catalogado) para não mascarar a base.
+const canonRamo = ramo => RAMO_CANON.get(normRamo(ramo)) || String(ramo || '').trim();
+
 // Ramos que NÃO entram na contagem da meta (match por trecho normalizado).
-const META_EXCLUDED_KEYS = ['VIAGEM', 'CARTA VERDE', 'ACIDENTES PESSOAIS', 'PREVIDENCIA', 'EVENTOS ALEATORIOS', 'TRANSPORTES NACIONAIS'];
+// 'VGBL' e 'EDUCACIONAL' entraram com a nomenclatura nova; 'PREVIDENCIA' cobre
+// 'Microsseguros de Previdência'.
+const META_EXCLUDED_KEYS = ['VIAGEM', 'CARTA VERDE', 'ACIDENTES PESSOAIS', 'PREVIDENCIA', 'VGBL',
+  'EVENTOS ALEATORIOS', 'TRANSPORTE NACIONAL', 'EDUCACIONAL'];
 // Ramos da equipe Pessoal; os demais não-excluídos caem em Patrimonial.
-const META_PESSOAIS_KEYS = ['VIDA', 'SAUDE', 'ODONTO', 'RC PROFISSIONAL', 'RC GERAL', 'RC ADMINISTRADORES', 'ADMINISTRADORES E DIRETORES', 'D&O'];
+// As chaves 'RC ...' cobrem as apólices legadas até o Quiver ser corrigido.
+const META_PESSOAIS_KEYS = ['VIDA', 'SAUDE', 'ODONTO',
+  'RESPONSABILIDADE CIVIL PROFISSIONAL', 'RESPONSABILIDADE CIVIL GERAL',
+  'ADMINISTRADORES E DIRETORES', 'D&O',
+  'RC PROFISSIONAL', 'RC GERAL', 'RC ADMINISTRADORES'];
+
+// Rótulos curtos para os eixos dos gráficos por ramo (chave = ramo normalizado).
+const RAMO_SHORT = {
+  'AUTOMOVEL - CASCO': 'Auto — casco',
+  'COMPREENSIVO RESIDENCIAL': 'Comp. residencial',
+  'COMPREENSIVO EMPRESARIAL': 'Comp. empresarial',
+  'COMPREENSIVO CONDOMINIO': 'Comp. condomínio',
+  'RESPONSABILIDADE CIVIL PROFISSIONAL': 'RC profissional',
+  'RESPONSABILIDADE CIVIL GERAL': 'RC geral',
+  'RESPONSABILIDADE CIVIL FACULTATIVA VEICULOS - RCFV': 'RCF veículos',
+  'RESPONSABILIDADE CIVIL DE ADMINISTRADORES E DIRETORES - D&O': 'RC D&O',
+  'GARANTIA SEGURADO - SETOR PUBLICO': 'Garantia setor púb.',
+  'MICROSSEGUROS DE PREVIDENCIA': 'Microsseg. previd.',
+  'ACIDENTES PESSOAIS - COLETIVO': 'Ac. pessoais colet.',
+  'EVENTOS ALEATORIOS - COLETIVO': 'Ev. aleatórios colet.',
+  'ODONTOLOGICO - COLETIVO': 'Odontológico colet.',
+  'SEGURO VIAGEM INDIVIDUAL': 'Viagem individual',
+  'TRANSPORTE NACIONAL': 'Transporte nac.',
+  'RISCOS DE ENGENHARIA': 'Riscos engenharia',
+  // Legados sem par oficial — só até o Quiver ser corrigido.
+  'RC PROFISSIONAL': 'RC profissional',
+  'RCF VEICULOS RCFV': 'RCF veículos',
+  'VGBL/VAGP/VRGP/VRSA/VRI': 'Previdência VGBL',
+};
+// Abrevia o ramo para os gráficos; sem entrada no mapa, devolve o nome oficial
+// em caixa de sentença.
+const shortRamo = n => RAMO_SHORT[normRamo(n)]
+  || String(n || '').toLowerCase().replace(/^\w/, c => c.toUpperCase());
 // → 'excluded' | 'pessoais' | 'patrimoniais'
 function classifyRamo(ramo) {
   const n = normRamo(ramo);
@@ -327,7 +401,7 @@ function parseProducaoArrayBuffer(buf) {
     return {
       tipo: String(r[COL.tipo] || '').trim(), vig: toDate(r[COL.vig]), em: toDate(r[COL.em]),
       fim: toDate(r[COL.fim]), cli: String(r[COL.cli] || ''), seg: String(r[COL.seg] || ''),
-      ramo: String(r[COL.ramo] || ''), grp: String(r[COL.grp] || ''),
+      ramo: canonRamo(r[COL.ramo]), grp: String(r[COL.grp] || ''),
       premio: parseFloat(r[COL.premio]) || 0, com: parseFloat(r[COL.com]) || 0,
       colab: String(r[COL.colab] || ''), sit: String(r[COL.sit] || ''),
       motivo: String(r[COL.motivo] || ''), cancel: toDate(r[COL.cancel]),
@@ -373,7 +447,7 @@ function parseClaimsArrayBuffer(buf) {
     encerra: toDate(r[COL_SIN.encerra]),
     status: String(r[COL_SIN.status] || '').trim(),
     seg: String(r[COL_SIN.seg] || '').trim(),
-    ramo: String(r[COL_SIN.ramo] || '').trim(),
+    ramo: canonRamo(r[COL_SIN.ramo]),
     cli: String(r[COL_SIN.cli] || '').trim(),
     valor: parseFloat(r[COL_SIN.valor]) || 0,
     pago: parseFloat(r[COL_SIN.pago]) || 0,
@@ -891,9 +965,8 @@ function renderRamo() {
   const field = getMetric('mt-ramo') === 'comissao' ? 'com' : 'premio';
   const byR = {}; FD.forEach(r => { if (r.ramo) byR[r.ramo] = (byR[r.ramo] || 0) + r[field]; });
   const sorted = Object.entries(byR).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const short = n => n.replace('AUTOMÓVEL - CASCO', 'Auto — casco').replace('COMPREENSIVO RESIDENCIAL', 'Comp. residencial').replace('COMPREENSIVO EMPRESARIAL', 'Comp. empresarial').replace('COMPREENSIVO CONDOMÍNIO', 'Comp. condomínio').replace('RC PROFISSIONAL', 'RC profissional').replace('VIDA INDIVIDUAL', 'Vida individual').replace('VIDA EM GRUPO', 'Vida em grupo').replace('TRANSPORTE NACIONAL', 'Transporte nac.').replace('RISCOS DIVERSOS', 'Riscos diversos').replace('RISCOS DE ENGENHARIA', 'Riscos engenharia').replace('OUTROS RAMOS', 'Outros ramos').toLowerCase().replace(/^\w/, c => c.toUpperCase());
   const ac = axisClr(), lc = labelClr(), gc = gridClr();
-  mkChart('ch-ramo', { type: 'bar', data: { labels: sorted.map(e => short(e[0])), datasets: [{ data: sorted.map(e => e[1]), backgroundColor: PALETA.slice(0, sorted.length), borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fBRL(ctx.raw) } } }, scales: { x: { ticks: { color: ac, font: { size: 10 }, callback: fShort }, grid: { color: gc } }, y: { ticks: { color: lc, font: { size: 11 } }, grid: { display: false } } } } });
+  mkChart('ch-ramo', { type: 'bar', data: { labels: sorted.map(e => shortRamo(e[0])), datasets: [{ data: sorted.map(e => e[1]), backgroundColor: PALETA.slice(0, sorted.length), borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fBRL(ctx.raw) } } }, scales: { x: { ticks: { color: ac, font: { size: 10 }, callback: fShort }, grid: { color: gc } }, y: { ticks: { color: lc, font: { size: 11 } }, grid: { display: false } } } } });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1489,8 +1562,8 @@ function renderCrossCampanha360() {
 // Cross-sell (match por trecho normalizado, mesmo critério de classifyRamo).
 // Demais ramos ficam disponíveis no filtro para o usuário ativar manualmente.
 const CROSS_MAIN_RAMOS = {
-  PF: ['VIDA INDIVIDUAL', 'RC PROFISSIONAL', 'AUTOMOVEL', 'RESIDENCIAL'],
-  PJ: ['SAUDE', 'VIDA EM GRUPO', 'EMPRESARIAL', 'RC PROFISSIONAL'],
+  PF: ['VIDA INDIVIDUAL', 'RESPONSABILIDADE CIVIL PROFISSIONAL', 'RC PROFISSIONAL', 'AUTOMOVEL', 'RESIDENCIAL'],
+  PJ: ['SAUDE', 'VIDA EM GRUPO', 'EMPRESARIAL', 'RESPONSABILIDADE CIVIL PROFISSIONAL', 'RC PROFISSIONAL'],
 };
 function isCrossMainRamo(ramo, pessoa) {
   const n = normRamo(ramo);
@@ -1592,8 +1665,8 @@ function renderCrossTab() {
 const CROSS_NIVEIS = [
   { label: 'Nível 1 — Essencial' },
   { label: 'Nível 2 — Ampliada' },
-  { label: 'Nível 3 — Plena' },
-  { label: 'Nível 4 — Master' },
+  { label: 'Nível 3 — Avançada' },
+  { label: 'Nível 4 — Plena' },
 ];
 function renderCrossNivel(clients) {
   const counts = [0, 0, 0, 0];
@@ -2136,7 +2209,6 @@ function renderRentabilidade() {
     return { k, premio, com, sin, qtd, rent: premio > 0 ? (premio - sin - com) / premio : null };
   }).sort((a, b) => (b.premio || 0) - (a.premio || 0));
   const shortSeg = n => n.replace(/ CIA DE SEGUROS GERAIS S\/A/g, '').replace(/ CIA NAC DE SEGUROS S\/A/g, '').replace(/ SEGUROS S\/A/g, '').replace(/ SEGURADORA S\/A/g, '').replace(/ SEGURADORA/g, '').replace(/ SEGS CORPORATIVOS SA/g, '').trim();
-  const shortRamo = n => n.replace('AUTOMÓVEL - CASCO', 'Auto — casco').replace('COMPREENSIVO RESIDENCIAL', 'Comp. residencial').replace('COMPREENSIVO EMPRESARIAL', 'Comp. empresarial').replace('COMPREENSIVO CONDOMÍNIO', 'Comp. condomínio').toLowerCase().replace(/^\w/, c => c.toUpperCase());
   const label = rentabilView === 'seg' ? 'Seguradora' : 'Ramo';
   const fmt = n => rentabilView === 'seg' ? shortSeg(n) : shortRamo(n);
   const rentBadge = pct => {
@@ -2254,6 +2326,145 @@ function renderCompTab() {
 
   if (sectionState['comp-chart']) renderCompChart(dataAtual, dataPrev, start, end, prev.start, prev.end);
   if (sectionState['comp-kpis']) renderCompKPIs(dataAtual, dataPrev);
+  if (sectionState['comp-pivot']) renderCompPivotTable();
+}
+
+// ── Comparativo por seguradora e ramo ───────────────────────────────────────────
+// Ao contrário do gráfico/KPIs acima (que usam o período próprio da aba), esta
+// tabela usa FD — o mesmo dado já filtrado por TODOS os filtros macro do topo
+// (vigência, emissão, colaborador, grupo, ramo, seguradora, tipo) — por isso os
+// números podem divergir do restante da aba quando os dois filtros não coincidem.
+function getCompPivotData(metricField) {
+  const years = [...new Set(FD.filter(r => r.vig).map(r => r.vig.getFullYear()))].sort((a, b) => a - b);
+  const seguradoras = new Map(); // seg -> { total: Map<ano,val>, ramos: Map<ramo, Map<ano,val>> }
+  const totalGeral = new Map(); // ano -> val
+
+  FD.forEach(r => {
+    if (!r.vig) return;
+    const ano = r.vig.getFullYear();
+    const val = r[metricField] || 0;
+    const seg = r.seg || 'Sem seguradora';
+    const ramo = r.ramo || 'Sem ramo';
+    if (!seguradoras.has(seg)) seguradoras.set(seg, { total: new Map(), ramos: new Map() });
+    const s = seguradoras.get(seg);
+    s.total.set(ano, (s.total.get(ano) || 0) + val);
+    if (!s.ramos.has(ramo)) s.ramos.set(ramo, new Map());
+    const rMap = s.ramos.get(ramo);
+    rMap.set(ano, (rMap.get(ano) || 0) + val);
+    totalGeral.set(ano, (totalGeral.get(ano) || 0) + val);
+  });
+
+  const somaAnos = m => [...m.values()].reduce((a, b) => a + b, 0);
+  const seguradorasList = [...seguradoras.entries()].map(([nome, s]) => ({
+    nome,
+    valores: s.total,
+    total: somaAnos(s.total),
+    ramos: [...s.ramos.entries()]
+      .map(([ramoNome, ramoMap]) => ({ nome: ramoNome, valores: ramoMap, total: somaAnos(ramoMap) }))
+      .sort((a, b) => b.total - a.total)
+  })).sort((a, b) => b.total - a.total);
+
+  return { years, seguradoras: seguradorasList, totalGeral };
+}
+
+function renderCompPivotTable() {
+  const wrap = document.getElementById('comp-pivot-wrap');
+  if (!wrap) return;
+  const metric = getMetric('mt-comp-pivot') === 'comissao' ? 'com' : 'premio';
+  const { years, seguradoras, totalGeral } = getCompPivotData(metric);
+
+  if (!years.length || !seguradoras.length) {
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px">Nenhum dado para o filtro atual.</div>';
+    return;
+  }
+
+  const pct = (val, ano) => { const t = totalGeral.get(ano) || 0; return t > 0 ? val / t : 0; };
+  const rowCells = valoresMap => years.map(y => {
+    const v = valoresMap.get(y) || 0;
+    return `<td class="num" style="border-left:1px solid var(--border-subtle)">${fBRL(v)}</td><td class="num">${fP(pct(v, y))}</td>`;
+  }).join('');
+
+  const thead = `<thead>
+    <tr>
+      <th rowspan="2" style="text-align:left;vertical-align:bottom">Seguradora / Ramo</th>
+      ${years.map(y => `<th colspan="2" style="text-align:center;border-left:1px solid var(--border-subtle)">${y}</th>`).join('')}
+    </tr>
+    <tr>
+      ${years.map(() => `<th class="num" style="border-left:1px solid var(--border-subtle)">Valor</th><th class="num">%</th>`).join('')}
+    </tr>
+  </thead>`;
+
+  const tbody = seguradoras.map(seg => {
+    const totalRow = `<tr class="comp-pivot-total"><td>${seg.nome}</td>${rowCells(seg.valores)}</tr>`;
+    const ramoRows = seg.ramos.map(r => `<tr class="comp-pivot-sub"><td>${r.nome}</td>${rowCells(r.valores)}</tr>`).join('');
+    return totalRow + ramoRows;
+  }).join('');
+
+  const tfoot = `<tfoot><tr><td>Total geral</td>${rowCells(totalGeral)}</tr></tfoot>`;
+
+  wrap.innerHTML = `<table class="ret-table" id="comp-pivot-table">${thead}<tbody>${tbody}</tbody>${tfoot}</table>`;
+}
+
+function compPivotExportEscHandler(e) { if (e.key === 'Escape') closeCompPivotExportModal(); }
+
+function openCompPivotExportModal() {
+  document.getElementById('comp-pivot-export-modal').style.display = 'flex';
+  document.addEventListener('keydown', compPivotExportEscHandler);
+}
+
+function closeCompPivotExportModal() {
+  document.getElementById('comp-pivot-export-modal').style.display = 'none';
+  document.removeEventListener('keydown', compPivotExportEscHandler);
+}
+
+function exportCompPivotAs(format) {
+  closeCompPivotExportModal();
+  const metric = getMetric('mt-comp-pivot') === 'comissao' ? 'com' : 'premio';
+  const { years, seguradoras, totalGeral } = getCompPivotData(metric);
+  if (!years.length || !seguradoras.length) { alert('Não há dados para exportar com o filtro atual.'); return; }
+
+  if (format === 'xlsx') {
+    const rows = [];
+    seguradoras.forEach(seg => {
+      const totalRow = { 'Seguradora': seg.nome, 'Ramo': '' };
+      years.forEach(y => {
+        const v = seg.valores.get(y) || 0, t = totalGeral.get(y) || 0;
+        totalRow[String(y)] = v;
+        totalRow[y + ' %'] = t > 0 ? v / t : 0;
+      });
+      rows.push(totalRow);
+      seg.ramos.forEach(r => {
+        const row = { 'Seguradora': '', 'Ramo': r.nome };
+        years.forEach(y => {
+          const v = r.valores.get(y) || 0, t = totalGeral.get(y) || 0;
+          row[String(y)] = v;
+          row[y + ' %'] = t > 0 ? v / t : 0;
+        });
+        rows.push(row);
+      });
+    });
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Comparativo');
+    XLSX.writeFile(workbook, 'Comparativo_Seguradora_Ramo.xlsx');
+  } else if (format === 'pdf') {
+    exportCompPivotPdf();
+  }
+}
+
+async function exportCompPivotPdf() {
+  const el = document.getElementById('comp-pivot-wrap');
+  if (!el || !window.html2canvas || !window.jspdf) return;
+  const canvas = await window.html2canvas(el, {
+    scale: 2, backgroundColor: '#0b0f18', useCORS: true,
+    width: el.scrollWidth, height: el.scrollHeight,
+    windowWidth: el.scrollWidth, windowHeight: el.scrollHeight
+  });
+  const { jsPDF } = window.jspdf;
+  const imgW = canvas.width, imgH = canvas.height;
+  const pdf = new jsPDF({ orientation: imgW >= imgH ? 'landscape' : 'portrait', unit: 'px', format: [imgW, imgH] });
+  pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, imgW, imgH);
+  pdf.save('Comparativo_Seguradora_Ramo.pdf');
 }
 
 function renderCompChart(dataAtual, dataPrev, startA, endA, startP, endP) {
@@ -2408,13 +2619,12 @@ function getMetasBasePeriod() {
 function filterMetasData(opts) {
   opts = opts || {};
   const { startStr, endStr } = getMetasBasePeriod();
-  // Honra os botões N / R do filtro "Tipo de documento"; mapeia endossos para o lado correspondente.
-  const sideSel = new Set();
-  activeTipos.forEach(t => { const s = metaTipoSide(t); if (s) sideSel.add(s); });
+  // Honra os botões de tipo (N, R, EN, ER...) do filtro "Tipo de documento" pelo
+  // tipo literal marcado — marcar só "N" traz só N (sem EN junto). Antes disso
+  // comparava pelo "lado" agrupado (metaTipoSide), que sempre juntava N+EN.
   return ALL.filter(r => {
-    const side = metaTipoSide(r.tipo);
-    if (!side) return false; // só N, R, EN, ER
-    if (sideSel.size && !sideSel.has(side)) return false;
+    if (!metaTipoSide(r.tipo)) return false; // só N, R, EN, ER entram na meta
+    if (activeTipos.size && !activeTipos.has(r.tipo)) return false;
     // comparação por string YYYY-MM-DD, idêntica à aba Produção (evita erro de fuso horário)
     const ds = fmtD(r.vig);
     if (!ds) return false;
@@ -2473,16 +2683,14 @@ function renderMetasTab() {
 
 // ── Acompanhamento semanal x meta ──────────────────────────────────────────────
 // Produção realizada no período selecionado (ano corrente), mesmo escopo da meta:
-// tipos N/R/EN/ER, ramos que contam, e honrando os filtros globais + botões N/R.
+// tipos N/R/EN/ER, ramos que contam, e honrando os filtros globais + botões de
+// tipo (pelo tipo literal marcado, não mais pelo "lado" agrupado — ver filterMetasData).
 function getMetasRealizadoData() {
   const vs = document.getElementById('f-vig-s').value;
   const ve = document.getElementById('f-vig-e').value;
-  const sideSel = new Set();
-  activeTipos.forEach(t => { const s = metaTipoSide(t); if (s) sideSel.add(s); });
   return ALL.filter(r => {
-    const side = metaTipoSide(r.tipo);
-    if (!side) return false;
-    if (sideSel.size && !sideSel.has(side)) return false;
+    if (!metaTipoSide(r.tipo)) return false;
+    if (activeTipos.size && !activeTipos.has(r.tipo)) return false;
     const ds = fmtD(r.vig);
     if (!ds) return false;
     if (vs && ds < vs) return false;
@@ -3384,3 +3592,355 @@ function exportMetasData(type) {
     XLSX.writeFile(wb, 'Metas_Equipe.xlsx');
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── EXIBIÇÃO TV ───────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Tela cheia dedicada para rodar numa TV: metade direita com indicadores gerais
+// da carteira, metade esquerda reservada para conteúdo futuro. Ignora os filtros
+// globais de propósito — é sempre a foto da base inteira (ALL), não a seleção
+// que um analista deixou marcada no dashboard.
+let tvExibicaoKeyHandler = null;
+const TV_EX_CHART_IDS = ['tv-ex-ano-chart', 'tv-ex-nivel-chart'];
+
+// Colaboradores fora de todos os gráficos da Exibição TV (pedido específico desta
+// tela — não mexe em nenhum outro lugar do dashboard). Compara pelo primeiro nome,
+// sem acento/maiúsculas, pra pegar variações de grafia do cadastro.
+const TV_COLAB_EXCLUIDOS = ['CELSO', 'DENISE', 'ALESSANDRA'];
+const tvColabExcluido = colab => TV_COLAB_EXCLUIDOS.some(nome => normRamo(colab).startsWith(nome));
+const tvBaseRows = () => ALL.filter(r => !tvColabExcluido(r.colab));
+
+function openTvExibicao() {
+  if (!ALL.length) { alert('Carregue os dados antes de abrir a exibição.'); return; }
+  let ov = document.getElementById('tv-exibicao');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'tv-exibicao';
+    ov.innerHTML = `
+      <button class="tv-ex-exit" onclick="closeTvExibicao()" title="Sair (Esc)">✕</button>
+      <div class="tv-ex-grid">
+        <div class="tv-ex-left">
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Meta mensal — Seguros novos</span>
+              <span class="chart-badge" id="tv-ex-novos-badge">—</span>
+            </div>
+            <div class="tv-ex-novos-body" id="tv-ex-novos-body"></div>
+          </div>
+          <div class="tv-ex-santolin-bar" id="tv-ex-santolin-com"></div>
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Top 3 vendedores — Santolin 360</span>
+              <span class="chart-badge" id="tv-ex-santolin-badge">—</span>
+            </div>
+            <div class="podium-grid tv-ex-santolin-podium" id="tv-ex-santolin-podium"></div>
+          </div>
+        </div>
+        <div class="tv-ex-right">
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Carteira acumulada — apólices ativas por ano</span>
+              <span class="chart-badge" id="tv-ex-ano-badge">—</span>
+            </div>
+            <div class="tv-ex-chart-wrap"><canvas id="tv-ex-ano-chart"></canvas></div>
+          </div>
+          <div class="tv-ex-santolin-bar" id="tv-ex-santolin-qtd"></div>
+          <div class="tv-ex-card">
+            <div class="chart-top">
+              <span class="chart-title">Clientes por nível</span>
+              <span class="chart-badge" id="tv-ex-nivel-badge">—</span>
+            </div>
+            <div class="tv-ex-chart-wrap"><canvas id="tv-ex-nivel-chart"></canvas></div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  tvExibicaoKeyHandler = e => { if (e.key === 'Escape') closeTvExibicao(); };
+  document.addEventListener('keydown', tvExibicaoKeyHandler);
+  renderTvExibicao();
+}
+
+function closeTvExibicao() {
+  const ov = document.getElementById('tv-exibicao');
+  if (ov) ov.style.display = 'none';
+  TV_EX_CHART_IDS.forEach(id => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } });
+  if (tvExibicaoKeyHandler) { document.removeEventListener('keydown', tvExibicaoKeyHandler); tvExibicaoKeyHandler = null; }
+}
+
+function renderTvExibicao() {
+  renderTvExMetaNovos();
+  renderTvExSantolinMetas();
+  renderTvExSantolinPodium();
+  renderTvExAnoChart();
+  renderTvExNivelChart();
+}
+
+// Barras de meta da campanha SANTOLIN 360 (mesmo widget da aba Cross-sell,
+// renderTierGoal), excluindo Celso/Denise igual ao resto da campanha nesta
+// tela. "Apólices vendidas" fica entre carteira acumulada e clientes por
+// nível (lado direito); "Comissão gerada" fica entre meta mensal e o pódio
+// (lado esquerdo).
+function renderTvExSantolinMetas() {
+  const qtdWrap = document.getElementById('tv-ex-santolin-qtd');
+  const comWrap = document.getElementById('tv-ex-santolin-com');
+  if (!qtdWrap || !comWrap) return;
+  const rows = getCampanha360Rows().filter(r => !tvColabExcluido(r.colab));
+  const qtd = rows.length;
+  const comissao = rows.reduce((s, r) => s + r.com, 0);
+  qtdWrap.innerHTML = renderTierGoal('Negócios Realizados', qtd, CAMPANHA_360_FASES_QTD, fN);
+  comWrap.innerHTML = renderTierGoal('Resultado Gerado', comissao, CAMPANHA_360_FASES_COM, fBRL);
+}
+
+// Pódio Top 3 — Santolin 360 (apólices vendidas e comissão gerada), mesmo
+// widget da aba Cross-sell (getCampanha360Rows + getCampanha360Ranking +
+// renderPodium), só excluindo Celso/Denise como o resto do lado esquerdo.
+function renderTvExSantolinPodium() {
+  const wrap = document.getElementById('tv-ex-santolin-podium');
+  if (!wrap) return;
+  document.getElementById('tv-ex-santolin-badge').textContent = CAMPANHA_360_NOME;
+  const rows = getCampanha360Rows().filter(r => !tvColabExcluido(r.colab));
+  if (!rows.length) {
+    wrap.innerHTML = '<div class="tv-ex-podium-empty">Nenhuma apólice da campanha Santolin 360 ainda.</div>';
+    return;
+  }
+  // Nome curto (primeiro nome + inicial do sobrenome) só pra exibição na TV —
+  // não mexe em renderPodium/getCampanha360Ranking, usados também na aba Cross-sell.
+  const shortName = nome => {
+    const partes = nome.trim().split(/\s+/);
+    return partes.length < 2 ? partes[0] : `${partes[0]} ${partes[1][0]}.`;
+  };
+  const rankQtd = getCampanha360Ranking(rows, 'qtd').map(r => ({ ...r, colab: shortName(r.colab) }));
+  const rankCom = getCampanha360Ranking(rows, 'comissao').map(r => ({ ...r, colab: shortName(r.colab) }));
+  wrap.innerHTML = `
+    <div class="podium-col">
+      <div class="podium-title">Top 3 — Negócios Realizados</div>
+      ${renderPodium(rankQtd)}
+    </div>
+    <div class="podium-col">
+      <div class="podium-title">Top 3 — Resultado Gerado</div>
+      ${renderPodium(rankCom)}
+    </div>`;
+}
+
+// ── Lado esquerdo: meta mensal de seguros novos ─────────────────────────────
+// Mesmo classifyRamo da aba Metas (ramos elegíveis/excluídos, split pessoais x
+// patrimoniais), mas só tipo de negócio N (sem endosso novo/renovações) — fixa
+// no mês corrente comparado ao mesmo mês do ano anterior, com crescimento fixo
+// de 40% (não usa o filtro de vigência nem o % configurável da aba Metas).
+const TV_NOVOS_GROWTH = 1.40;
+
+function buildTvMetaNovos() {
+  const now = today();
+  const y = now.getFullYear(), mIdx = now.getMonth(); // 0-indexado
+  const pad = n => String(n).padStart(2, '0');
+  const lastDay = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
+  const curStart = `${y}-${pad(mIdx + 1)}-01`, curEnd = `${y}-${pad(mIdx + 1)}-${pad(lastDay(y, mIdx))}`;
+  const baseY = y - 1;
+  const baseStart = `${baseY}-${pad(mIdx + 1)}-01`, baseEnd = `${baseY}-${pad(mIdx + 1)}-${pad(lastDay(baseY, mIdx))}`;
+
+  const TEAMS = ['geral', 'pessoais', 'patrimoniais'];
+  const data = {};
+  TEAMS.forEach(t => { data[t] = { realPremio: 0, realCom: 0, basePremio: 0, baseCom: 0 }; });
+
+  tvBaseRows().forEach(r => {
+    if (r.tipo !== 'N') return; // só tipo de negócio N
+    const team = classifyRamo(r.ramo); // exclui ramos fora da meta (classifyRamo === 'excluded')
+    if (!data[team]) return;
+    const ds = fmtD(r.vig);
+    if (!ds) return;
+    const acc = ds >= curStart && ds <= curEnd ? 'real' : ds >= baseStart && ds <= baseEnd ? 'base' : null;
+    if (!acc) return;
+    [data[team], data.geral].forEach(d => { d[acc + 'Premio'] += r.premio; d[acc + 'Com'] += r.com; });
+  });
+
+  TEAMS.forEach(t => {
+    data[t].metaPremio = data[t].basePremio * TV_NOVOS_GROWTH;
+    data[t].metaCom = data[t].baseCom * TV_NOVOS_GROWTH;
+  });
+
+  return { curStart, data };
+}
+
+function renderTvExMetaNovos() {
+  const body = document.getElementById('tv-ex-novos-body');
+  if (!body) return;
+  const { curStart, data } = buildTvMetaNovos();
+  const ML = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const [y, m] = curStart.split('-');
+  document.getElementById('tv-ex-novos-badge').textContent = ML[+m - 1] + '/' + y;
+
+  const pctCls = p => p >= 1 ? 'msem-ok' : p >= 0.8 ? 'msem-warn' : 'msem-bad';
+  const TEAMS = ['geral', 'pessoais', 'patrimoniais'];
+  const card = (t, metric) => {
+    const d = data[t];
+    const real = metric === 'comissao' ? d.realCom : d.realPremio;
+    const meta = metric === 'comissao' ? d.metaCom : d.metaPremio;
+    const pct = meta ? real / meta : 0, gap = real - meta;
+    const pctClamp = Math.max(0, Math.min(1, pct));
+    return `<div class="msem-card" style="--tc:${METAS_SEM_TEAM_COLOR[t]}">
+      <div class="msem-card-head"><span class="msem-dot"></span>${METAS_SEM_TEAM_LBL[t]}</div>
+      <div class="msem-pct ${pctCls(pct)}">${fP(pct)}</div>
+      <div class="msem-bar"><div class="msem-bar-fg" style="width:${(pctClamp * 100).toFixed(1)}%"></div></div>
+      <div class="msem-nums">${fBRL(real)} <span class="msem-meta">/ ${fBRL(meta)}</span></div>
+      <div class="msem-gap ${gap >= 0 ? 'pos' : 'neg'}">${gap >= 0 ? '+' : ''}${fBRL(gap)}</div>
+    </div>`;
+  };
+  const row = (metric, lbl) => `<div class="msem-row tv-ex-novos-row"><div class="msem-row-lbl">${lbl}</div>${TEAMS.map(t => card(t, metric)).join('')}</div>`;
+  body.innerHTML = row('premio', 'Prêmio') + row('comissao', 'Comissão');
+}
+
+// Duração mínima (em dias) pra uma apólice contar como parte da carteira nos
+// gráficos da Exibição TV (carteira acumulada e clientes por nível) — ~12
+// meses, com folga de 15 dias pra não excluir uma anual normal (sempre fecha
+// em 364/365 dias). Abaixo disso é seguro temporário/acessório (viagem, carta
+// verde e similares). Não filtra pelo nome do ramo porque a duração já pega
+// viagem/carta verde e qualquer outro produto de curta duração junto.
+const TV_CARTEIRA_MIN_DIAS = 350;
+const tvDuracaoOk = r => !r.fim || (r.fim - r.vig) / 86400000 >= TV_CARTEIRA_MIN_DIAS;
+
+// Todos os clientes (PF + PJ), de qualquer colaborador (clientes por nível não
+// exclui Celso/Denise — só o ranking e os cards da esquerda excluem) — mesma
+// lógica de agregação da aba Cross-sell (buildCrossMap), já descontando os
+// seguros temporários/acessórios (tvDuracaoOk).
+function tvExClientes() {
+  const map = new Map();
+  ALL.forEach(r => {
+    if (!r.docDigits) return;
+    let c = map.get(r.docDigits);
+    if (!c) { c = { doc: r.docDigits, apolicesAtivas: 0, primeiraVig: null }; map.set(r.docDigits, c); }
+    if (r.sit === 'Ativa' && r.tipoDoc === 'APÓLICE' && tvDuracaoOk(r)) c.apolicesAtivas++;
+    if (r.vig && (!c.primeiraVig || r.vig < c.primeiraVig)) c.primeiraVig = r.vig;
+  });
+  return [...map.values()];
+}
+
+// Carteira acumulada por ano: retrato por data, não pelo status de hoje, para
+// os anos já fechados. Para cada ano Y anterior ao corrente, conta quantas
+// apólices já tinham vigência iniciada e ainda não tinham terminado/sido
+// canceladas até 31/12 daquele ano. Usa r.fim (término de vigência) e
+// r.cancel (data de cancelamento) — não r.sit — porque o status atual só
+// reflete o presente: uma apólice de anos atrás que já renovou várias vezes
+// hoje aparece como "Renovada"/"Vencida", mas estava genuinamente em vigor
+// naquele ano. Isso também evita contar a mesma apólice em vários anos (cada
+// renovação é uma linha com sua própria janela vig→fim, sem sobreposição).
+//
+// O ano corrente é diferente: como ainda está em andamento, não faz sentido
+// aplicar o mesmo "retrato" (contaria apólices de anos passados que ainda não
+// venceram, mas que também ainda não sabemos se serão renovadas). Em vez
+// disso, conta só as apólices ATIVAS hoje cuja vigência começou dentro do
+// próprio ano corrente (a partir de 01/01).
+function buildTvAnoCarteira() {
+  const rows = ALL
+    .filter(r => r.tipoDoc === 'APÓLICE' && r.vig && tvDuracaoOk(r))
+    .map(r => ({ vig: r.vig, fim: (r.sit === 'Cancelada' && r.cancel) ? r.cancel : r.fim, sit: r.sit }));
+  if (!rows.length) return { labels: [], data: [] };
+  const minY = Math.min(...rows.map(r => r.vig.getFullYear()));
+  const maxY = today().getFullYear();
+  const jan1CurYear = new Date(maxY, 0, 1);
+  const labels = [], data = [];
+  for (let y = minY; y <= maxY; y++) {
+    let count;
+    if (y === maxY) {
+      count = rows.filter(r => r.sit === 'Ativa' && r.vig >= jan1CurYear).length;
+    } else {
+      const checkpoint = new Date(y, 11, 31);
+      count = rows.filter(r => r.vig <= checkpoint && (!r.fim || r.fim >= checkpoint)).length;
+    }
+    labels.push(String(y));
+    data.push(count);
+  }
+  return { labels, data };
+}
+
+// Rótulo com o valor acima de cada barra do dataset indicado (só a barra, não
+// a linha de tendência sobreposta — senão o rótulo desenharia duas vezes).
+function tvBarValueLabelPlugin(datasetIndex) {
+  return {
+    id: 'tvBarValueLabel',
+    afterDatasetsDraw(chart) {
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (!meta || meta.hidden) return;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.font = '700 12px Inter, system-ui, sans-serif';
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = labelClr();
+      const ds = chart.data.datasets[datasetIndex];
+      meta.data.forEach((el, i) => {
+        const v = ds.data[i];
+        if (v == null) return;
+        ctx.fillText(fN(v), el.x, el.y - 6);
+      });
+      ctx.restore();
+    },
+  };
+}
+
+function renderTvExAnoChart() {
+  const { labels, data } = buildTvAnoCarteira();
+  const total = data.length ? data[data.length - 1] : 0;
+  document.getElementById('tv-ex-ano-badge').textContent = fN(total) + ' apólices ativas';
+  const ac = axisClr(), lc = labelClr(), gc = gridClr();
+  mkChart('tv-ex-ano-chart', {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: 'Apólices', data, backgroundColor: '#4E80FF', borderRadius: 4, order: 2 },
+        { type: 'line', label: 'Tendência', data, borderColor: 'rgb(238 34 34 / 0.95)', borderWidth: 3, pointRadius: 0, tension: .3, fill: false, order: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' apólices' } } },
+      scales: {
+        x: { ticks: { color: lc, font: { size: 12 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: ac, font: { size: 11 }, precision: 0 }, grid: { color: gc } },
+      },
+    },
+    plugins: [tvBarValueLabelPlugin(0)],
+  });
+}
+
+// Clientes por nível — mesma classificação/contagem da aba Cross-sell (CROSS_NIVEIS),
+// mas sem os filtros de colaborador/busca daquela aba: é sempre a carteira inteira.
+function buildTvNivelCounts() {
+  const counts = [0, 0, 0, 0];
+  tvExClientes().forEach(c => {
+    const n = c.apolicesAtivas;
+    if (n <= 0) return;
+    counts[Math.min(n, 4) - 1]++;
+  });
+  return counts;
+}
+
+function renderTvExNivelChart() {
+  const counts = buildTvNivelCounts();
+  const total = counts.reduce((s, v) => s + v, 0);
+  document.getElementById('tv-ex-nivel-badge').textContent = fN(total) + ' clientes';
+  const ac = axisClr(), lc = labelClr(), gc = gridClr();
+  mkChart('tv-ex-nivel-chart', {
+    type: 'bar',
+    data: {
+      labels: CROSS_NIVEIS.map(n => n.label),
+      datasets: [{ data: counts, backgroundColor: PALETA.slice(0, 4), borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.7 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' clientes (' + fP(total ? ctx.raw / total : 0) + ')' } },
+      },
+      scales: {
+        x: { ticks: { color: lc, font: { size: 11 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: ac, font: { size: 11 }, precision: 0 }, grid: { color: gc } },
+      },
+    },
+    plugins: [tvBarValueLabelPlugin(0)],
+  });
+}
+
