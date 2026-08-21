@@ -1420,6 +1420,26 @@ input[type=date]:focus {
   color: var(--k-amber);
 }
 
+.sit-badge-ativa {
+  background: var(--pos-bg);
+  color: var(--pos-text);
+}
+
+.sit-badge-renovada {
+  background: var(--accent-dim);
+  color: #90AFFF;
+}
+
+.sit-badge-suspensa {
+  background: rgba(167, 139, 250, 0.13);
+  color: var(--k-purple);
+}
+
+.sit-badge-perda-total {
+  background: var(--neg-bg);
+  color: var(--neg-text);
+}
+
 .detail-table-wrap {
   overflow-x: auto;
   max-height: 400px;
@@ -1470,6 +1490,51 @@ input[type=date]:focus {
   color: var(--text-secondary);
 }
 
+/* Escopo global aplicado à aba — deixa explícito por que os números mudaram */
+#comp-clear-period-btn.is-hidden {
+  display: none;
+}
+
+.comp-scope-chips {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.comp-scope-chips::before {
+  content: 'Escopo';
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.comp-scope-chip {
+  font-size: 10px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(78, 128, 255, 0.28);
+  color: #90AFFF;
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comp-scope-chip-neutral {
+  background: var(--neu-bg);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+}
+
 /* 6-button toggle for comp metrics */
 .comp-metric-toggle {
   display: flex;
@@ -1508,10 +1573,28 @@ input[type=date]:focus {
   font-weight: 600;
 }
 
-/* KPI comparison grid */
+/* KPI comparison grid — 4 blocos de 4 cards (resultado, novo x renovação,
+   eficiência & risco, cobertura); grid de 4 colunas que degrada em telas menores */
+.kpi-comp-block {
+  margin-bottom: 22px;
+}
+
+.kpi-comp-block:last-child {
+  margin-bottom: 0;
+}
+
+.kpi-comp-block-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
 .kpi-comp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
 }
 
@@ -1521,6 +1604,16 @@ input[type=date]:focus {
   border-radius: var(--r-md);
   padding: 12px 14px;
   box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kpi-comp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .kpi-comp-label {
@@ -1529,33 +1622,11 @@ input[type=date]:focus {
   letter-spacing: .6px;
   color: var(--text-secondary);
   font-weight: 500;
-  margin-bottom: 10px;
 }
 
-.kpi-comp-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.kpi-comp-period {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.kpi-comp-period-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: var(--text-tertiary);
-}
-
-.kpi-comp-period-value {
-  font-size: 16px;
-  font-weight: 600;
+.kpi-comp-value {
+  font-size: 22px;
+  font-weight: 700;
   font-family: var(--font-mono);
   color: var(--text-primary);
   font-variant-numeric: tabular-nums lining-nums;
@@ -1564,16 +1635,19 @@ input[type=date]:focus {
   text-overflow: ellipsis;
 }
 
-.kpi-comp-prev {
-  color: var(--text-secondary);
-  font-size: 14px;
+.kpi-comp-foot {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi-comp-trend {
   font-size: 11px;
   font-weight: 700;
   font-family: var(--font-mono);
-  padding: 4px 9px;
+  padding: 3px 8px;
   border-radius: 20px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -2917,6 +2991,31 @@ body.tv-mode .metas-inputs-bar {
   padding-left: 28px;
   color: var(--text-secondary);
   font-weight: 400;
+}
+
+.comp-pivot-bulk {
+  display: flex;
+  gap: 4px;
+}
+
+.comp-pivot-bulk.is-hidden {
+  display: none;
+}
+
+.comp-pivot-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.comp-pivot-toggle:hover {
+  color: var(--accent);
+}
+
+.comp-pivot-chevron {
+  display: inline-block;
+  width: 14px;
+  font-size: 9px;
+  color: var(--text-tertiary);
 }
 
 /* ══════════════════════════════════════════

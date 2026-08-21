@@ -559,11 +559,15 @@
           </div>
         </div>
         <button class="btn-sm" onclick="applyCompFilter()" style="align-self:flex-end">Comparar</button>
+        <button class="btn-sm is-hidden" id="comp-clear-period-btn" onclick="clearCompPeriodOverride()"
+          style="align-self:flex-end" title="Voltar a usar o período do filtro de Vigência do topo">&#8635; Seguir
+          filtro global</button>
         <div class="comp-period-labels">
           <span class="comp-period-tag" id="comp-periodo-atual-tag">—</span>
           <span style="font-size:12px;color:var(--text-tertiary);font-weight:600">vs.</span>
           <span class="comp-period-tag comp-period-tag-prev" id="comp-periodo-prev-tag">—</span>
         </div>
+        <div class="comp-scope-chips" id="comp-scope-chips"></div>
       </div>
 
       <!-- Gráfico principal -->
@@ -618,7 +622,7 @@
         </div>
         <div class="section-body" id="sb-comp-kpis">
           <div style="padding:16px">
-            <div class="kpi-comp-grid" id="comp-kpis-grid"></div>
+            <div id="comp-kpis-grid"></div>
           </div>
         </div>
       </div>
@@ -628,6 +632,23 @@
         <div class="section-header open" onclick="toggleSection('comp-pivot')">
           <span class="section-title">Comparativo por seguradora e ramo</span>
           <div class="section-controls" onclick="event.stopPropagation()">
+            <div class="metric-toggle">
+              <input type="radio" name="vw-comp-pivot" id="vw-comp-pivot-s" value="seg"
+                onchange="setCompPivotView('seg')">
+              <label for="vw-comp-pivot-s">Seguradora</label>
+              <input type="radio" name="vw-comp-pivot" id="vw-comp-pivot-r" value="ramo"
+                onchange="setCompPivotView('ramo')">
+              <label for="vw-comp-pivot-r">Ramo</label>
+              <input type="radio" name="vw-comp-pivot" id="vw-comp-pivot-a" value="ambos" checked
+                onchange="setCompPivotView('ambos')">
+              <label for="vw-comp-pivot-a">Seguradora + ramo</label>
+            </div>
+            <div class="comp-pivot-bulk" id="comp-pivot-bulk">
+              <button class="btn-sm" style="font-size:11px" onclick="toggleAllCompPivotGroups(true)"
+                title="Recolher os ramos de todas as seguradoras">&#8722; Recolher</button>
+              <button class="btn-sm" style="font-size:11px" onclick="toggleAllCompPivotGroups(false)"
+                title="Expandir os ramos de todas as seguradoras">&#43; Expandir</button>
+            </div>
             <div class="metric-toggle">
               <input type="radio" name="mt-comp-pivot" id="mt-comp-pivot-p" value="premio" checked
                 onchange="renderCompPivotTable()">
@@ -642,6 +663,39 @@
         </div>
         <div class="section-body" id="sb-comp-pivot">
           <div class="ret-table-wrap" id="comp-pivot-wrap"></div>
+        </div>
+      </div>
+
+      <!-- Maiores variações — ranking por produtor/seguradora/ramo, novo x renovação -->
+      <div class="section-card" id="sc-comp-rank">
+        <div class="section-header open" onclick="toggleSection('comp-rank')">
+          <span class="section-title">Maiores variações</span>
+          <div class="section-controls" onclick="event.stopPropagation()">
+            <div class="metric-toggle">
+              <input type="radio" name="comp-rank-dim" id="crd-colab" value="colab" checked
+                onchange="onCompRankDimChange(this.value)">
+              <label for="crd-colab">Produtor</label>
+              <input type="radio" name="comp-rank-dim" id="crd-seg" value="seg"
+                onchange="onCompRankDimChange(this.value)">
+              <label for="crd-seg">Seguradora</label>
+              <input type="radio" name="comp-rank-dim" id="crd-ramo" value="ramo"
+                onchange="onCompRankDimChange(this.value)">
+              <label for="crd-ramo">Ramo</label>
+            </div>
+            <div class="metric-toggle">
+              <input type="radio" name="comp-rank-metric" id="crm-premio" value="premio" checked
+                onchange="onCompRankMetricChange(this.value)">
+              <label for="crm-premio">Prêmio</label>
+              <input type="radio" name="comp-rank-metric" id="crm-com" value="com"
+                onchange="onCompRankMetricChange(this.value)">
+              <label for="crm-com">Comissão</label>
+            </div>
+            <button class="collapse-btn" id="cb-comp-rank">−</button>
+          </div>
+        </div>
+        <div class="section-body" id="sb-comp-rank">
+          <div class="ret-table-wrap" id="comp-rank-wrap"></div>
+          <div id="comp-rank-counter" style="padding:8px 12px;font-size:11px;color:var(--text-tertiary)"></div>
         </div>
       </div>
 

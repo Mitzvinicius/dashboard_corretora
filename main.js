@@ -1,6 +1,9 @@
 // ── State ──────────────────────────────────────────────────────────────────────
 let ALL = [], FD = [];
 let compStartDate = '', compEndDate = '', compMetric = 'premio_novo';
+let compPivotView = 'ambos';            // 'seg' | 'ramo' | 'ambos'
+const compPivotCollapsed = new Set();   // seguradoras recolhidas no modo hierárquico
+let compPeriodManual = false; // true quando o usuário define o período direto na aba (botão "Comparar")
 let CLAIMS = [], FD_CLAIMS = [];
 let claimsSourceCounts = { sinistrosAvisados: 0, sinistrosPagamentos: 0 };
 let sinistralView = 'seg', rentabilView = 'seg';
@@ -24,7 +27,7 @@ const RET_MS = { col: new Set(), ram: new Set(), grp: new Set(), mot: new Set() 
 let retActiveTipos = new Set();
 let retDetailFilter = '';
 let retSortKey = 'pctQtd', retSortDir = 'desc';
-const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'comp-pivot': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
+const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'comp-pivot': true, 'comp-rank': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
 let metaSortKey = 'totalAnt', metaSortDir = 'desc';
 let metaWeekTeam = 'geral';    // geral | pessoais | patrimoniais
 let metaWeekMetric = 'premio'; // premio | comissao
@@ -131,9 +134,30 @@ const COL = {
   fim: 'TÉRMINO DE VIGÊNCIA', cli: 'CLIENTE', seg: 'SEGURADORA',
   ramo: 'RAMO', grp: 'GRUPO DE PRODUÇÃO', premio: 'PRÊMIO', com: 'COMISSÃO',
   colab: 'COLABORADOR', sit: 'SITUAÇÃO', motivo: 'MOTIVO CANCELAMENTO', cancel: 'DATA CANCELAMENTO',
-  doc: 'CPF/CNPJ', pessoa: 'TIPO PESSOA', tipoDoc: 'TIPO DOCUMENTO', campanha: 'CAMPANHA'
+  doc: 'CPF/CNPJ', pessoa: 'TIPO PESSOA', tipoDoc: 'TIPO DOCUMENTO', campanha: 'CAMPANHA',
+  // ATENÇÃO: 'APÓLICE' NÃO é chave única. Endossos e faturas repetem o número da
+  // apólice-mãe a que estão vinculados e se distinguem pela numeração própria em
+  // 'ENDOSSO'. Para isolar a apólice em si, exija endosso vazio (ver isApolice()).
+  apolice: 'APÓLICE', endosso: 'ENDOSSO'
 };
 const TIPO_LABELS = { R: 'R — Renovação', N: 'N — Negócio novo', ER: 'ER — Endosso renov.', EN: 'EN — Endosso novo', CR: 'CR — Cancel. renov.', CN: 'CN — Cancel. novo' };
+// ── Situações (coluna SITUAÇÃO) ────────────────────────────────────────────────
+// O conjunto completo que a planilha emite. 'Renovada', 'Suspensa' e 'Perda Total'
+// existiam nos dados muito antes de o código conhecê-las — daí a constante única,
+// para não voltarmos a espalhar literais soltos por aí.
+const SIT = {
+  ATIVA: 'Ativa', RENOVADA: 'Renovada', VENCIDA: 'Vencida',
+  CANCELADA: 'Cancelada', SUSPENSA: 'Suspensa', PERDA_TOTAL: 'Perda Total'
+};
+// Desfechos de uma apólice que chegou ao término da vigência: renovou ou não voltou.
+// É a base da taxa de renovação — Cancelada/Suspensa/Perda Total saíram por evento
+// alheio à renovação (no meio da vigência), então não eram candidatas.
+const SIT_DESFECHO_RENOVACAO = [SIT.RENOVADA, SIT.VENCIDA];
+
+// Uma linha é a apólice em si (não endosso/fatura) quando não traz número de endosso.
+// Cruzamos com TIPO DOCUMENTO porque as duas fontes divergem em registros legados.
+function isApolice(r) { return !r.endosso && r.tipoDoc === 'APÓLICE'; }
+
 const PALETA = ['#378ADD', '#639922', '#E24B4A', '#BA7517', '#534AB7', '#1D9E75', '#D4537E', '#888780', '#5DCAA5', '#F09595', '#97C459', '#BC8CFF'];
 
 // ── Theme Responsiveness ───────────────────────────────────────────────────────
@@ -270,6 +294,7 @@ function toggleSection(key) {
     if (key === 'ret-cohort') renderCohorts();
     if (key === 'ret-risco') renderRiskWarning();
     if (key === 'comp-chart' || key === 'comp-kpis') renderCompTab();
+    if (key === 'comp-rank') renderCompRankTable();
     if (['sin-kpis', 'sin-charts', 'sin-sinistralidade', 'sin-rentabilidade'].includes(key)) renderSinistrosTab();
     if (key === 'metas-semanal') renderMetasSemanal();
     if (key === 'metas-colab') renderMetasColabTable();
@@ -406,7 +431,8 @@ function parseProducaoArrayBuffer(buf) {
       colab: String(r[COL.colab] || ''), sit: String(r[COL.sit] || ''),
       motivo: String(r[COL.motivo] || ''), cancel: toDate(r[COL.cancel]),
       docDigits, tipoPessoa, tipoDoc: String(r[COL.tipoDoc] || '').trim(),
-      campanha: String(r[COL.campanha] || '').trim()
+      campanha: String(r[COL.campanha] || '').trim(),
+      apolice: String(r[COL.apolice] || '').trim(), endosso: String(r[COL.endosso] || '').trim()
     };
   });
 }
@@ -826,6 +852,7 @@ function resetFilters() {
   [...document.querySelectorAll('.ms-wrap')].forEach(w => { if (w._msObj === MS && w._key) { renderMsListGeneric(w._list, w._vals, MS, w._key); updateMsTriggerGeneric(w, MS, w._key, w._placeholder); } });
   activeTipos = new Set(); document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
   activeCancelMotivos = null; FD = [...ALL]; FD_CLAIMS = [...CLAIMS];
+  compPeriodManual = false; compStartDate = ''; compEndDate = ''; // aba Comparativo volta a seguir o default/vigência global
   document.getElementById('rec-badge').textContent = fN(FD.length) + ' registros';
   render();
   if (document.getElementById('tab-producao').classList.contains('active')) renderProdTab();
@@ -1083,37 +1110,52 @@ function renderRetTab() {
   renderRetDetailTable();
 }
 
+// ── Churn pela situação da apólice ─────────────────────────────────────────────
+// A apólice renovada vira 'Renovada' e a vigente nasce 'Ativa'. Por isso 'Renovada'
+// fica fora do universo: contá-la junto da sucessora duplicaria o mesmo contrato.
+//
+// Universo (denominador) = apólices, sem endossos, que estiveram em vigor no período:
+//   Ativa (retida) + Cancelada (perdida na vigência) + Vencida (não renovada)
+// Perda (numerador) = Cancelada + Vencida.
+// Suspensa e Perda Total ficam fora dos dois lados — saíram por evento alheio à
+// retenção, mesma regra usada na taxa de renovação da aba Comparativo.
+const SIT_CHURN_PERDA = [SIT.CANCELADA, SIT.VENCIDA];
+const SIT_CHURN_UNIVERSO = [SIT.ATIVA, SIT.CANCELADA, SIT.VENCIDA];
+
+function isChurnBase(r) {
+  return isApolice(r) && (r.tipo === 'N' || r.tipo === 'R') && SIT_CHURN_UNIVERSO.includes(r.sit);
+}
+function newChurnAcc(nome) {
+  return { nome, qtdBase: 0, premioBase: 0, comBase: 0, qtdAtiva: 0, qtdCancel: 0, premioCancel: 0, comEstorno: 0, vencidas: 0, premioVencido: 0 };
+}
+function accChurn(a, r) {
+  if (!isChurnBase(r)) return;
+  a.qtdBase++; a.premioBase += r.premio; a.comBase += r.com;
+  if (r.sit === SIT.ATIVA) a.qtdAtiva++;
+  if (SIT_CHURN_PERDA.includes(r.sit)) {
+    a.qtdCancel++; a.premioCancel += Math.abs(r.premio); a.comEstorno += Math.abs(r.com);
+  }
+  if (r.sit === SIT.VENCIDA) { a.vencidas++; a.premioVencido += r.premio; }
+}
+
 // ── KPIs retenção ──────────────────────────────────────────────────────────────
 function renderRetKPIs() {
   const data = getRetData();
-  // Base (denominador): tipos R, N, ER, EN com situação Ativa
-  const TIPOS_BASE = ['R', 'N', 'ER', 'EN'];
-  const base = data.filter(r => TIPOS_BASE.includes(r.tipo) && r.sit === 'Ativa');
-  const qtdBase = base.length;
-  const premioBase = base.reduce((s, r) => s + r.premio, 0);
-  const comBase = base.reduce((s, r) => s + r.com, 0);
-  // Churn (numerador): tipos CR e CN
-  const cancelEndossos = data.filter(r => r.tipo === 'CR' || r.tipo === 'CN');
-  const qtdCancel = cancelEndossos.length;
-  const premioCancel = Math.abs(cancelEndossos.reduce((s, r) => s + r.premio, 0));
-  const comEstorno = Math.abs(cancelEndossos.reduce((s, r) => s + r.com, 0));
-  // Vencidas
-  const vencidas = data.filter(r => r.sit === 'Vencida');
-  const premioVencido = vencidas.reduce((s, r) => s + r.premio, 0);
-  // % churn
-  const pctChurnQtd = qtdBase > 0 ? qtdCancel / qtdBase : 0;
-  const pctChurnPremio = premioBase > 0 ? premioCancel / premioBase : 0;
-  const pctChurnCom = comBase > 0 ? comEstorno / comBase : 0;
+  const a = newChurnAcc('total');
+  data.forEach(r => accChurn(a, r));
+  const pctChurnQtd = a.qtdBase > 0 ? a.qtdCancel / a.qtdBase : 0;
+  const pctChurnPremio = a.premioBase > 0 ? a.premioCancel / a.premioBase : 0;
+  const pctChurnCom = a.comBase > 0 ? a.comEstorno / a.comBase : 0;
 
   document.getElementById('ret-kpi-grid').innerHTML = [
-    { l: 'Apólices ativas (base)', v: fN(qtdBase), s: 'tipos R, N, ER, EN', c: 'k-blue' },
-    { l: 'Prêmio ativo (base)', v: fBRL(premioBase), s: 'tipos R, N, ER, EN', c: 'k-blue' },
-    { l: 'Comissão ativa (base)', v: fBRL(comBase), s: 'tipos R, N, ER, EN', c: 'k-blue' },
-    { l: 'Churn — Itens', v: fP(pctChurnQtd), s: fN(qtdCancel) + ' endossos CR+CN', c: 'k-red' },
-    { l: 'Churn — Prêmio', v: fP(pctChurnPremio), s: fBRL(premioCancel) + ' em CR+CN', c: 'k-red' },
-    { l: 'Churn — Comissão', v: fP(pctChurnCom), s: fBRL(comEstorno) + ' a estornar', c: 'k-red' },
-    { l: 'Apólices não renovadas', v: fN(vencidas.length), s: 'situação = Vencida', c: 'k-amber' },
-    { l: 'Prêmio em risco', v: fBRL(premioVencido), s: 'apólices vencidas', c: 'k-amber' },
+    { l: 'Apólices na base', v: fN(a.qtdBase), s: fN(a.qtdAtiva) + ' ativas + canc. + venc.', c: 'k-blue' },
+    { l: 'Prêmio na base', v: fBRL(a.premioBase), s: 'apólices, sem endossos', c: 'k-blue' },
+    { l: 'Comissão na base', v: fBRL(a.comBase), s: 'apólices, sem endossos', c: 'k-blue' },
+    { l: 'Churn — Itens', v: fP(pctChurnQtd), s: fN(a.qtdCancel) + ' perdidas (canc. + venc.)', c: 'k-red' },
+    { l: 'Churn — Prêmio', v: fP(pctChurnPremio), s: fBRL(a.premioCancel) + ' perdido', c: 'k-red' },
+    { l: 'Churn — Comissão', v: fP(pctChurnCom), s: fBRL(a.comEstorno) + ' a estornar', c: 'k-red' },
+    { l: 'Apólices não renovadas', v: fN(a.vencidas), s: 'situação = Vencida', c: 'k-amber' },
+    { l: 'Prêmio não renovado', v: fBRL(a.premioVencido), s: 'apólices vencidas', c: 'k-amber' },
   ].map(k => `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value" style="font-size:${k.v.length > 9 ? '16px' : '20px'}">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
 }
 
@@ -1209,17 +1251,20 @@ function renderCohorts() {
 }
 
 // ── Score de Risco de Churn ────────────────────────────────────────────────────
+// Taxa histórica de perda por seguradora/ramo/colaborador, usada para pontuar risco.
+// Mesma definição de churn dos KPIs (ver accChurn): universo = apólices Ativa +
+// Cancelada + Vencida; perda = Cancelada + Vencida.
 function calcRiskRates() {
-  const TIPOS_BASE_P = ['R', 'N', 'ER', 'EN'];
   const metrics = { seg: {}, ram: {}, col: {} };
   ALL.forEach(r => {
-    if (!TIPOS_BASE_P.includes(r.tipo) && r.tipo !== 'CR' && r.tipo !== 'CN') return;
+    if (!isChurnBase(r)) return;
+    const perda = SIT_CHURN_PERDA.includes(r.sit);
     ['seg', 'ramo', 'colab'].forEach(ft => {
       const k = r[ft] || 'N/A';
       const t = ft === 'ramo' ? 'ram' : ft === 'colab' ? 'col' : 'seg';
       if (!metrics[t][k]) metrics[t][k] = { base: 0, churn: 0 };
-      if (TIPOS_BASE_P.includes(r.tipo) && r.sit === 'Ativa') metrics[t][k].base++;
-      if (r.tipo === 'CR' || r.tipo === 'CN') { metrics[t][k].churn++; metrics[t][k].base++; }
+      metrics[t][k].base++;
+      if (perda) metrics[t][k].churn++;
     });
   });
   const calcP = dict => {
@@ -1288,17 +1333,12 @@ function renderRetProdTable() {
   const viewKey = getMetric('vt-ret') === 'grp' ? 'grp' : 'colab';
   const label = getMetric('vt-ret') === 'grp' ? 'Grupo' : 'Colaborador';
 
-  // Agregar por produtor
-  const TIPOS_BASE_P = ['R', 'N', 'ER', 'EN'];
+  // Agregar por produtor — mesma regra dos KPIs acima (ver accChurn)
   const map = {};
   data.forEach(r => {
     const k = r[viewKey] || 'Sem identificação';
-    if (!map[k]) map[k] = { nome: k, qtdBase: 0, premioBase: 0, comBase: 0, qtdCancel: 0, premioCancel: 0, comEstorno: 0, vencidas: 0 };
-    // Base: R, N, ER, EN ativos
-    if (TIPOS_BASE_P.includes(r.tipo) && r.sit === 'Ativa') { map[k].qtdBase++; map[k].premioBase += r.premio; map[k].comBase += r.com; }
-    // Churn: CR e CN
-    if (r.tipo === 'CR' || r.tipo === 'CN') { map[k].qtdCancel++; map[k].premioCancel += Math.abs(r.premio); map[k].comEstorno += Math.abs(r.com); }
-    if (r.sit === 'Vencida') map[k].vencidas++;
+    if (!map[k]) map[k] = newChurnAcc(k);
+    accChurn(map[k], r);
   });
 
   let rows = Object.values(map).map(v => ({
@@ -1348,11 +1388,11 @@ function renderRetProdTable() {
     <table class="ret-table">
       <thead><tr>
         ${th('nome', label, 'left')}
-        ${th('qtdBase', 'Ativas (base)')}
-        ${th('qtdCancel', 'CR+CN (qtd)')}
+        ${th('qtdBase', 'Base (apólices)')}
+        ${th('qtdCancel', 'Perdidas')}
         ${th('pctQtd', '% Churn itens')}
         ${th('premioBase', 'Prêmio base', 'right')}
-        ${th('premioCancel', 'Prêmio CR+CN', 'right')}
+        ${th('premioCancel', 'Prêmio perdido', 'right')}
         ${th('pctPremio', '% Churn prêmio')}
         ${th('comEstorno', 'Comissão estorno', 'right')}
         ${th('pctCom', '% Churn comissão')}
@@ -1409,10 +1449,15 @@ function renderRetDetailTable() {
     const col = isCxNx ? '#dc2626' : '#16a34a';
     return `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;background:${bg};color:${col}">${TIPO_LABELS_D[tipo] || tipo}</span>`;
   };
+  const SIT_BADGE_CLS = {
+    [SIT.ATIVA]: 'sit-badge-ativa', [SIT.RENOVADA]: 'sit-badge-renovada',
+    [SIT.VENCIDA]: 'sit-badge-vencida', [SIT.CANCELADA]: 'sit-badge-cancelada',
+    [SIT.SUSPENSA]: 'sit-badge-suspensa', [SIT.PERDA_TOTAL]: 'sit-badge-perda-total'
+  };
   const sitBadge = sit => {
-    if (sit === 'Cancelada') return `<span class="sit-badge sit-badge-cancelada">${sit}</span>`;
-    if (sit === 'Vencida') return `<span class="sit-badge sit-badge-vencida">${sit}</span>`;
-    return `<span style="font-size:11px;color:#555">${sit}</span>`;
+    const cls = SIT_BADGE_CLS[sit];
+    return cls ? `<span class="sit-badge ${cls}">${sit}</span>`
+      : `<span style="font-size:11px;color:var(--text-secondary)">${sit}</span>`;
   };
 
   const tbody = rows.map(r => {
@@ -1894,22 +1939,20 @@ function exportData(type) {
   } else if (type === 'churn') {
     const rawData = getRetData();
     const viewKey = getMetric('vt-ret') === 'grp' ? 'grp' : 'colab';
-    const TIPOS_BASE_P = ['R', 'N', 'ER', 'EN'];
     const map = {};
     rawData.forEach(r => {
       const k = r[viewKey] || 'Sem identificação';
-      if (!map[k]) map[k] = { nome: k, qtdBase: 0, premioBase: 0, comBase: 0, qtdCancel: 0, premioCancel: 0, comEstorno: 0, vencidas: 0 };
-      if (TIPOS_BASE_P.includes(r.tipo) && r.sit === 'Ativa') { map[k].qtdBase++; map[k].premioBase += r.premio; map[k].comBase += r.com; }
-      if (r.tipo === 'CR' || r.tipo === 'CN') { map[k].qtdCancel++; map[k].premioCancel += Math.abs(r.premio); map[k].comEstorno += Math.abs(r.com); }
-      if (r.sit === 'Vencida') map[k].vencidas++;
+      if (!map[k]) map[k] = newChurnAcc(k);
+      accChurn(map[k], r);
     });
     const rows = Object.values(map).map(v => ({
       'Nome': v.nome,
-      'Ativas (base)': v.qtdBase,
-      'CR+CN (qtd)': v.qtdCancel,
+      'Base (apólices)': v.qtdBase,
+      'Ativas': v.qtdAtiva,
+      'Perdidas (canc+venc)': v.qtdCancel,
       '% Churn itens': v.qtdBase > 0 ? (v.qtdCancel / v.qtdBase) : 0,
       'Prêmio base': v.premioBase,
-      'Prêmio CR+CN': v.premioCancel,
+      'Prêmio perdido': v.premioCancel,
       '% Churn prêmio': v.premioBase > 0 ? (v.premioCancel / v.premioBase) : 0,
       'Comissão estorno': v.comEstorno,
       '% Churn comissão': v.comBase > 0 ? (v.comEstorno / v.comBase) : 0,
@@ -2247,15 +2290,55 @@ function prevYearDates(start, end) {
   return { start: fmtD(s), end: fmtD(e) };
 }
 
-function getCompData(start, end) {
+// Desloca o range de emissão 1 ano para trás (mesma regra da vigência), preservando
+// pontas vazias — prevYearDates não aceita string vazia, então só chamamos por lado preenchido.
+function shiftEmissaoRangeToPrevYear(es, ee) {
+  if (es && ee) return prevYearDates(es, ee);
+  if (es) return { start: prevYearDates(es, es).start, end: '' };
+  if (ee) return { start: '', end: prevYearDates(ee, ee).end };
+  return { start: '', end: '' };
+}
+
+// Escopo global do topo (colaborador, grupo, ramo, seguradora, tipo, emissão), sem
+// recorte de vigência — quem chama decide a âncora temporal. getCompData ancora em
+// 'vig'; a safra de renovação ancora em 'fim'.
+function matchesCompScope(r, emStart, emEnd) {
+  if (emStart && r.em && fmtD(r.em) < emStart) return false;
+  if (emEnd && r.em && fmtD(r.em) > emEnd) return false;
+  if (MS.col.size > 0 && !MS.col.has(r.colab)) return false;
+  if (MS.grp.size > 0 && !MS.grp.has(r.grp)) return false;
+  if (MS.ram.size > 0 && !MS.ram.has(r.ramo)) return false;
+  if (MS.seg.size > 0 && !MS.seg.has(r.seg)) return false;
+  if (activeTipos.size > 0 && !activeTipos.has(r.tipo)) return false;
+  return true;
+}
+
+function getCompData(start, end, emStart, emEnd) {
   return ALL.filter(r => {
     if (start && r.vig && fmtD(r.vig) < start) return false;
     if (end && r.vig && fmtD(r.vig) > end) return false;
-    if (MS.col.size > 0 && !MS.col.has(r.colab)) return false;
-    if (MS.grp.size > 0 && !MS.grp.has(r.grp)) return false;
-    if (MS.ram.size > 0 && !MS.ram.has(r.ramo)) return false;
-    if (MS.seg.size > 0 && !MS.seg.has(r.seg)) return false;
-    return true;
+    return matchesCompScope(r, emStart, emEnd);
+  });
+}
+
+// Safra "a renovar" do período: apólices (não endossos) de negócio novo ou renovação
+// cujo TÉRMINO DE VIGÊNCIA cai no período e que já chegaram a um desfecho — renovou
+// (Renovada) ou não voltou (Vencida).
+//
+// Âncora em 'fim', não em 'vig': a pergunta é "o que venceu neste período", diferente
+// do resto da aba. Canceladas/Suspensas/Perda Total ficam fora porque saíram no meio
+// da vigência, então nunca foram candidatas a renovar — incluí-las diluiria a taxa
+// com perdas que não são falha de renovação.
+function getCompSafraData(start, end, emStart, emEnd) {
+  return ALL.filter(r => {
+    if (!r.fim) return false;
+    const fim = fmtD(r.fim);
+    if (start && fim < start) return false;
+    if (end && fim > end) return false;
+    if (r.tipo !== 'N' && r.tipo !== 'R') return false;
+    if (!isApolice(r)) return false;
+    if (!SIT_DESFECHO_RENOVACAO.includes(r.sit)) return false;
+    return matchesCompScope(r, emStart, emEnd);
   });
 }
 
@@ -2298,6 +2381,15 @@ function applyCompFilter() {
   const e = document.getElementById('comp-end').value;
   if (!s || !e) return;
   compStartDate = s; compEndDate = e;
+  compPeriodManual = true;
+  renderCompTab();
+}
+
+// Volta a aba a seguir a vigência global (ou o default), descartando o período manual
+function clearCompPeriodOverride() {
+  compPeriodManual = false;
+  compStartDate = '';
+  compEndDate = '';
   renderCompTab();
 }
 
@@ -2308,15 +2400,36 @@ function onCompMetricChange(val) {
 
 function renderCompTab() {
   if (!ALL.length) return;
-  let start = compStartDate, end = compEndDate;
-  if (!start || !end) {
+  // Precedência do período: override manual da aba > vigência global (se ambas as pontas
+  // estiverem preenchidas) > default (1º de janeiro do ano corrente até hoje).
+  const vgs = document.getElementById('f-vig-s').value, vge = document.getElementById('f-vig-e').value;
+  const followingGlobalVigencia = !(compPeriodManual && compStartDate && compEndDate) && !!(vgs && vge);
+  let start, end;
+  if (compPeriodManual && compStartDate && compEndDate) {
+    start = compStartDate; end = compEndDate;
+  } else if (vgs && vge) {
+    start = vgs; end = vge;
+  } else {
     const t = today();
     start = `${t.getFullYear()}-01-01`;
     end = fmtD(t);
   }
+
+  const cs = document.getElementById('comp-start'), ce = document.getElementById('comp-end');
+  if (cs) cs.value = start;
+  if (ce) ce.value = end;
+  const clearBtn = document.getElementById('comp-clear-period-btn');
+  if (clearBtn) clearBtn.classList.toggle('is-hidden', !compPeriodManual);
+
+  const es = document.getElementById('f-em-s').value, ee = document.getElementById('f-em-e').value;
   const prev = prevYearDates(start, end);
-  const dataAtual = getCompData(start, end);
-  const dataPrev = getCompData(prev.start, prev.end);
+  const emPrev = shiftEmissaoRangeToPrevYear(es, ee);
+  const dataAtual = getCompData(start, end, es, ee);
+  const dataPrev = getCompData(prev.start, prev.end, emPrev.start, emPrev.end);
+  // Safra de renovação: recorte próprio (ancorado no término de vigência), por isso
+  // não sai de dataAtual/dataPrev, que estão filtrados pelo início de vigência.
+  const safraAtual = getCompSafraData(start, end, es, ee);
+  const safraPrev = getCompSafraData(prev.start, prev.end, emPrev.start, emPrev.end);
 
   const fmtLabel = d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
   document.getElementById('comp-periodo-atual-tag').textContent =
@@ -2324,16 +2437,66 @@ function renderCompTab() {
   document.getElementById('comp-periodo-prev-tag').textContent =
     `Anterior: ${fmtLabel(prev.start)} → ${fmtLabel(prev.end)}`;
 
+  renderCompScopeChips(followingGlobalVigencia);
+
+  // Guardado aqui (e não dentro de renderCompKPIs) para que o ranking continue vivo
+  // quando a section de KPIs estiver colapsada — os toggles do ranking releem daqui.
+  _compLastData = { atual: dataAtual, prev: dataPrev };
+
   if (sectionState['comp-chart']) renderCompChart(dataAtual, dataPrev, start, end, prev.start, prev.end);
-  if (sectionState['comp-kpis']) renderCompKPIs(dataAtual, dataPrev);
+  if (sectionState['comp-kpis']) renderCompKPIs(dataAtual, dataPrev, safraAtual, safraPrev);
   if (sectionState['comp-pivot']) renderCompPivotTable();
+  if (sectionState['comp-rank']) renderCompRankTable();
+}
+
+// Chips que resumem, na própria aba, quais filtros globais do topo estão recortando o comparativo
+function renderCompScopeChips(followingGlobalVigencia) {
+  const wrap = document.getElementById('comp-scope-chips');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  const addChip = (text, neutral) => {
+    const chip = document.createElement('span');
+    chip.className = neutral ? 'comp-scope-chip comp-scope-chip-neutral' : 'comp-scope-chip';
+    chip.textContent = text; // textContent evita qualquer injeção via valores vindos da planilha
+    wrap.appendChild(chip);
+  };
+  const msChip = (set, pluralWord) => set.size === 0 ? null : (set.size === 1 ? [...set][0] : `${set.size} ${pluralWord}`);
+
+  const chips = [
+    msChip(MS.col, 'colaboradores'),
+    msChip(MS.grp, 'grupos'),
+    msChip(MS.ram, 'ramos'),
+    msChip(MS.seg, 'seguradoras')
+  ].filter(Boolean);
+
+  if (activeTipos.size > 0) chips.push(`Tipo: ${[...activeTipos].join(', ')}`);
+
+  const es = document.getElementById('f-em-s').value, ee = document.getElementById('f-em-e').value;
+  const fmtLabel = d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
+  if (es && ee) chips.push(`Emissão: ${fmtLabel(es)} → ${fmtLabel(ee)}`);
+  else if (es) chips.push(`Emissão: ${fmtLabel(es)} → —`);
+  else if (ee) chips.push(`Emissão: — → ${fmtLabel(ee)}`);
+
+  // O chip de período só aparece quando há de fato uma origem a explicar — no default
+  // (1º/jan → hoje) não há filtro nenhum por trás dele, então omitimos.
+  if (compPeriodManual && compStartDate && compEndDate) chips.unshift('Período: definido na aba');
+  else if (followingGlobalVigencia) chips.unshift('Período: seguindo filtro global');
+
+  if (chips.length === 0) {
+    addChip('Sem filtros globais — carteira completa', true);
+    return;
+  }
+  chips.forEach(c => addChip(c));
 }
 
 // ── Comparativo por seguradora e ramo ───────────────────────────────────────────
-// Ao contrário do gráfico/KPIs acima (que usam o período próprio da aba), esta
-// tabela usa FD — o mesmo dado já filtrado por TODOS os filtros macro do topo
-// (vigência, emissão, colaborador, grupo, ramo, seguradora, tipo) — por isso os
-// números podem divergir do restante da aba quando os dois filtros não coincidem.
+// Gráfico, KPIs e esta tabela agora compartilham os mesmos filtros globais do topo
+// (colaborador, grupo, ramo, seguradora, tipo, emissão). A diferença que resta é de
+// recorte temporal: a aba compara dois períodos (atual vs. mesmo range do ano
+// anterior, deslocado via prevYearDates/shiftEmissaoRangeToPrevYear) — período esse
+// que segue a vigência global por padrão mas pode ter sido sobrescrito manualmente
+// (compPeriodManual) — enquanto o pivô abaixo agrupa por ano civil usando FD direto.
 function getCompPivotData(metricField) {
   const years = [...new Set(FD.filter(r => r.vig).map(r => r.vig.getFullYear()))].sort((a, b) => a - b);
   const seguradoras = new Map(); // seg -> { total: Map<ano,val>, ramos: Map<ramo, Map<ano,val>> }
@@ -2367,11 +2530,61 @@ function getCompPivotData(metricField) {
   return { years, seguradoras: seguradorasList, totalGeral };
 }
 
+// Achata a hierarquia seguradora→ramo nas linhas da visualização escolhida.
+// 'seg'   → só as seguradoras;
+// 'ramo'  → ramos somados entre todas as seguradoras (reagrupa de verdade; filtrar
+//           a hierarquia repetiria o mesmo ramo uma vez por seguradora);
+// 'ambos' → seguradora seguida dos seus ramos, com recolhimento individual.
+function buildCompPivotRows(seguradoras, view) {
+  if (view === 'seg') {
+    return seguradoras.map(s => ({ nome: s.nome, valores: s.valores, level: 0 }));
+  }
+  if (view === 'ramo') {
+    const porRamo = new Map();
+    seguradoras.forEach(s => s.ramos.forEach(r => {
+      if (!porRamo.has(r.nome)) porRamo.set(r.nome, new Map());
+      const acc = porRamo.get(r.nome);
+      r.valores.forEach((v, ano) => acc.set(ano, (acc.get(ano) || 0) + v));
+    }));
+    const soma = m => [...m.values()].reduce((a, b) => a + b, 0);
+    return [...porRamo.entries()]
+      .map(([nome, valores]) => ({ nome, valores, level: 0, total: soma(valores) }))
+      .sort((a, b) => b.total - a.total);
+  }
+  const rows = [];
+  seguradoras.forEach(s => {
+    const recolhida = compPivotCollapsed.has(s.nome);
+    rows.push({ nome: s.nome, valores: s.valores, level: 0, collapsible: s.ramos.length > 0, collapsed: recolhida });
+    if (!recolhida) s.ramos.forEach(r => rows.push({ nome: r.nome, valores: r.valores, level: 1 }));
+  });
+  return rows;
+}
+
+function setCompPivotView(v) { compPivotView = v; renderCompPivotTable(); }
+
+function toggleCompPivotGroup(nome) {
+  if (compPivotCollapsed.has(nome)) compPivotCollapsed.delete(nome); else compPivotCollapsed.add(nome);
+  renderCompPivotTable();
+}
+
+function toggleAllCompPivotGroups(collapse) {
+  compPivotCollapsed.clear();
+  if (collapse) {
+    const metric = getMetric('mt-comp-pivot') === 'comissao' ? 'com' : 'premio';
+    getCompPivotData(metric).seguradoras.forEach(s => compPivotCollapsed.add(s.nome));
+  }
+  renderCompPivotTable();
+}
+
 function renderCompPivotTable() {
   const wrap = document.getElementById('comp-pivot-wrap');
   if (!wrap) return;
   const metric = getMetric('mt-comp-pivot') === 'comissao' ? 'com' : 'premio';
   const { years, seguradoras, totalGeral } = getCompPivotData(metric);
+
+  // Recolher/expandir só faz sentido na visão hierárquica.
+  const bulk = document.getElementById('comp-pivot-bulk');
+  if (bulk) bulk.classList.toggle('is-hidden', compPivotView !== 'ambos');
 
   if (!years.length || !seguradoras.length) {
     wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px">Nenhum dado para o filtro atual.</div>';
@@ -2384,9 +2597,10 @@ function renderCompPivotTable() {
     return `<td class="num" style="border-left:1px solid var(--border-subtle)">${fBRL(v)}</td><td class="num">${fP(pct(v, y))}</td>`;
   }).join('');
 
+  const colLabel = compPivotView === 'seg' ? 'Seguradora' : compPivotView === 'ramo' ? 'Ramo' : 'Seguradora / Ramo';
   const thead = `<thead>
     <tr>
-      <th rowspan="2" style="text-align:left;vertical-align:bottom">Seguradora / Ramo</th>
+      <th rowspan="2" style="text-align:left;vertical-align:bottom">${colLabel}</th>
       ${years.map(y => `<th colspan="2" style="text-align:center;border-left:1px solid var(--border-subtle)">${y}</th>`).join('')}
     </tr>
     <tr>
@@ -2394,10 +2608,15 @@ function renderCompPivotTable() {
     </tr>
   </thead>`;
 
-  const tbody = seguradoras.map(seg => {
-    const totalRow = `<tr class="comp-pivot-total"><td>${seg.nome}</td>${rowCells(seg.valores)}</tr>`;
-    const ramoRows = seg.ramos.map(r => `<tr class="comp-pivot-sub"><td>${r.nome}</td>${rowCells(r.valores)}</tr>`).join('');
-    return totalRow + ramoRows;
+  // O nome vai em data-seg (não interpolado no onclick) porque vem da planilha e
+  // pode conter aspas — quebraria o atributo.
+  const tbody = buildCompPivotRows(seguradoras, compPivotView).map(row => {
+    if (row.level === 1) return `<tr class="comp-pivot-sub"><td>${escHtml(row.nome)}</td>${rowCells(row.valores)}</tr>`;
+    const attrs = row.collapsible
+      ? ` class="comp-pivot-toggle" data-seg="${escHtml(row.nome)}" onclick="toggleCompPivotGroup(this.dataset.seg)" title="Recolher/expandir ramos"`
+      : '';
+    const chevron = row.collapsible ? `<span class="comp-pivot-chevron">${row.collapsed ? '▸' : '▾'}</span>` : '';
+    return `<tr class="comp-pivot-total"><td${attrs}>${chevron}${escHtml(row.nome)}</td>${rowCells(row.valores)}</tr>`;
   }).join('');
 
   const tfoot = `<tfoot><tr><td>Total geral</td>${rowCells(totalGeral)}</tr></tfoot>`;
@@ -2424,29 +2643,30 @@ function exportCompPivotAs(format) {
   if (!years.length || !seguradoras.length) { alert('Não há dados para exportar com o filtro atual.'); return; }
 
   if (format === 'xlsx') {
-    const rows = [];
-    seguradoras.forEach(seg => {
-      const totalRow = { 'Seguradora': seg.nome, 'Ramo': '' };
+    // Exporta exatamente a visualização em tela — incluindo grupos recolhidos, senão
+    // o arquivo contradiz o que o usuário está vendo.
+    const view = compPivotView;
+    const labelCol = view === 'ramo' ? 'Ramo' : 'Seguradora';
+    const rows = buildCompPivotRows(seguradoras, view).map(r => {
+      const row = view === 'ambos'
+        ? { 'Seguradora': r.level === 0 ? r.nome : '', 'Ramo': r.level === 1 ? r.nome : '' }
+        : { [labelCol]: r.nome };
       years.forEach(y => {
-        const v = seg.valores.get(y) || 0, t = totalGeral.get(y) || 0;
-        totalRow[String(y)] = v;
-        totalRow[y + ' %'] = t > 0 ? v / t : 0;
+        const v = r.valores.get(y) || 0, t = totalGeral.get(y) || 0;
+        row[String(y)] = v;
+        row[y + ' %'] = t > 0 ? v / t : 0;
       });
-      rows.push(totalRow);
-      seg.ramos.forEach(r => {
-        const row = { 'Seguradora': '', 'Ramo': r.nome };
-        years.forEach(y => {
-          const v = r.valores.get(y) || 0, t = totalGeral.get(y) || 0;
-          row[String(y)] = v;
-          row[y + ' %'] = t > 0 ? v / t : 0;
-        });
-        rows.push(row);
-      });
+      return row;
     });
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+    // Ordem explícita: chaves como '2025' são índices inteiros em JS e migram para o
+    // início do objeto, jogando a coluna de rótulo para o meio da planilha.
+    const header = (view === 'ambos' ? ['Seguradora', 'Ramo'] : [labelCol])
+      .concat(...years.map(y => [String(y), y + ' %']));
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Comparativo');
-    XLSX.writeFile(workbook, 'Comparativo_Seguradora_Ramo.xlsx');
+    const sufixo = view === 'seg' ? 'Seguradora' : view === 'ramo' ? 'Ramo' : 'Seguradora_Ramo';
+    XLSX.writeFile(workbook, 'Comparativo_' + sufixo + '.xlsx');
   } else if (format === 'pdf') {
     exportCompPivotPdf();
   }
@@ -2526,65 +2746,250 @@ function renderCompChart(dataAtual, dataPrev, startA, endA, startP, endP) {
   });
 }
 
-function renderCompKPIs(dataAtual, dataPrev) {
+// Escapa texto vindo da planilha (produtor/seguradora/ramo) antes de injetar em innerHTML.
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Último par atual/anterior resolvido por renderCompTab. A tabela de "Maiores
+// variações" relê daqui ao trocar dimensão/métrica, evitando refiltrar ALL a cada clique.
+let _compLastData = null;
+let compRankDim = 'colab';
+let compRankMetric = 'premio';
+
+function renderCompKPIs(dataAtual, dataPrev, safraAtual, safraPrev) {
   const TIPOS_PROD = ['N', 'R', 'ER', 'EN'];
+  const fPct2 = v => (v * 100).toFixed(2) + '%';
+
+  // Aproveitamento da safra que venceu no período: renovou / (renovou + não voltou).
+  function calcSafra(safra) {
+    const renovadas = safra.filter(r => r.sit === SIT.RENOVADA).length;
+    const vencidas = safra.filter(r => r.sit === SIT.VENCIDA).length;
+    const base = renovadas + vencidas;
+    return { renovadas, vencidas, base, taxa: base ? renovadas / base : null };
+  }
+  const fA = calcSafra(safraAtual || []), fP2 = calcSafra(safraPrev || []);
+
   function calcKPIs(data) {
-    const cancelQtd = data.filter(r => r.tipo === 'CN' || r.tipo === 'CR').length;
-    const endossosQtd = data.filter(r => r.tipo === 'EN' || r.tipo === 'ER').length;
-    const cliUnicos = new Set(data.map(r => r.cli).filter(Boolean)).size;
     const prod = data.filter(r => TIPOS_PROD.includes(r.tipo));
-    const premioTot = prod.reduce((s, r) => s + r.premio, 0);
-    const comTot = prod.reduce((s, r) => s + r.com, 0);
-    const ticket = prod.length ? premioTot / prod.length : 0;
-    const pctCom = premioTot ? comTot / premioTot : 0;
-    const taxaChurn = prod.length ? cancelQtd / prod.length : 0;
-    const premioRisco = data.filter(r => r.sit === 'Cancelada').reduce((s, r) => s + Math.abs(r.premio), 0);
-    const renovQtd = data.filter(r => r.tipo === 'R').length;
-    const prodAtivos = new Set(data.filter(r => r.tipo === 'N').map(r => r.colab).filter(Boolean)).size;
-    return { cancelQtd, endossosQtd, cliUnicos, ticket, pctCom, taxaChurn, premioRisco, renovQtd, prodAtivos };
+    const premioTotal = prod.reduce((s, r) => s + r.premio, 0);
+    const comTotal = prod.reduce((s, r) => s + r.com, 0);
+    const apolices = prod.length;
+    const clientesUnicos = new Set(data.map(r => r.cli).filter(Boolean)).size;
+
+    const premioNovo = data.filter(r => r.tipo === 'N' || r.tipo === 'EN').reduce((s, r) => s + r.premio, 0);
+    const premioRenov = data.filter(r => r.tipo === 'R' || r.tipo === 'ER').reduce((s, r) => s + r.premio, 0);
+    const mixNovo = premioTotal ? premioNovo / premioTotal : 0;
+
+    const ticketMedio = apolices ? premioTotal / apolices : 0;
+    const comMediaPct = premioTotal ? comTotal / premioTotal : 0;
+    const cancelQtd = data.filter(r => r.tipo === 'CN' || r.tipo === 'CR').length;
+    const taxaChurn = apolices ? cancelQtd / apolices : 0;
+    const canceladas = data.filter(r => r.sit === 'Cancelada');
+    const premioRisco = canceladas.reduce((s, r) => s + Math.abs(r.premio), 0);
+
+    const produtoresAtivos = new Set(prod.map(r => r.colab).filter(Boolean)).size;
+    const seguradorasAtivas = new Set(prod.map(r => r.seg).filter(Boolean)).size;
+    const ramosAtivos = new Set(prod.map(r => r.ramo).filter(Boolean)).size;
+    const endossos = data.filter(r => r.tipo === 'EN' || r.tipo === 'ER').length;
+
+    return {
+      premioTotal, comTotal, apolices, clientesUnicos, premioNovo, premioRenov, mixNovo,
+      ticketMedio, comMediaPct, taxaChurn, cancelQtd, premioRisco, canceladasQtd: canceladas.length,
+      produtoresAtivos, seguradorasAtivas, ramosAtivos, endossos
+    };
   }
 
   const sA = calcKPIs(dataAtual), sP = calcKPIs(dataPrev);
 
-  function compCard(label, vA, vP, fmt, lowerIsBetter) {
+  // type: 'money' | 'count' | 'pct'. neutral força a cor cinza no badge (usado quando
+  // "maior" não é nem bom nem ruim, ex. mix novo x renovação), mas mantém seta/valor.
+  function kpiCard(label, vA, vP, type, opts = {}) {
+    const { lowerIsBetter = false, neutral = false, footExtra = null, na = false, naCompare = false, title = '' } = opts;
+    const fmt = type === 'money' ? fBRL : type === 'pct' ? fPct2 : fN;
+    const delta = vA - vP;
+    const deltaTxt = type === 'money' ? (delta >= 0 ? '+' : '−') + fBRL(Math.abs(delta))
+      : type === 'pct' ? (delta >= 0 ? '+' : '−') + Math.abs(delta * 100).toFixed(1) + ' p.p.'
+      : (delta >= 0 ? '+' : '−') + fN(Math.abs(delta));
+
     const refZero = vP === 0 && vA === 0;
-    const diff = vP !== 0 ? ((vA - vP) / Math.abs(vP)) * 100 : (vA > 0 ? 100 : 0);
-    const isUp = !refZero && diff > 0.1;
-    const isDown = !refZero && diff < -0.1;
+    const diffRel = vP !== 0 ? ((vA - vP) / Math.abs(vP)) * 100 : (vA > 0 ? 100 : 0);
+    const isUp = !refZero && diffRel > 0.1;
+    const isDown = !refZero && diffRel < -0.1;
     const isGood = lowerIsBetter ? isDown : isUp;
     const isBad = lowerIsBetter ? isUp : isDown;
-    const tCls = refZero ? 'trend-neutral' : isGood ? 'trend-up' : isBad ? 'trend-down' : 'trend-neutral';
-    const arrow = isUp ? '▲ ' : isDown ? '▼ ' : '';
-    const diffTxt = !refZero && (isUp || isDown) ? Math.abs(diff).toFixed(1) + '%' : '—';
-    return `<div class="kpi-comp-card">
-          <div class="kpi-comp-label">${label}</div>
-          <div class="kpi-comp-row">
-            <div class="kpi-comp-period">
-              <span class="kpi-comp-period-label">Atual</span>
-              <span class="kpi-comp-period-value">${fmt(vA)}</span>
-            </div>
-            <div class="kpi-comp-period">
-              <span class="kpi-comp-period-label">Anterior</span>
-              <span class="kpi-comp-period-value kpi-comp-prev">${fmt(vP)}</span>
-            </div>
-            <div class="kpi-comp-trend ${tCls}">${arrow}${diffTxt}</div>
+    const tCls = neutral ? 'trend-neutral' : (refZero ? 'trend-neutral' : isGood ? 'trend-up' : isBad ? 'trend-down' : 'trend-neutral');
+    const arrow = refZero ? '' : isUp ? '▲ ' : isDown ? '▼ ' : '';
+    const badgeTxt = !refZero && (isUp || isDown) ? Math.abs(diffRel).toFixed(1) + '%' : '—';
+
+    const foot = footExtra ? footExtra(delta, deltaTxt) : `ant. ${fmt(vP)} · Δ ${deltaTxt}`;
+    const titleAttr = title ? ` title="${escHtml(title)}"` : '';
+
+    // 'na' = não há base para calcular no período (ex.: nada venceu). Mostrar 0% aqui
+    // mentiria — é ausência de dado, não resultado ruim.
+    return `<div class="kpi-comp-card"${titleAttr}>
+          <div class="kpi-comp-top">
+            <span class="kpi-comp-label">${label}</span>
+            <span class="kpi-comp-trend ${(na || naCompare) ? 'trend-neutral' : tCls}">${(na || naCompare) ? '—' : arrow + badgeTxt}</span>
           </div>
+          <div class="kpi-comp-value">${na ? '—' : fmt(vA)}</div>
+          <div class="kpi-comp-foot">${foot}</div>
         </div>`;
   }
 
-  const fPct2 = v => (v * 100).toFixed(2) + '%';
+  const blocks = [
+    {
+      title: 'Resultado do período', cards: [
+        kpiCard('Prêmio total', sA.premioTotal, sP.premioTotal, 'money'),
+        kpiCard('Comissão total', sA.comTotal, sP.comTotal, 'money'),
+        kpiCard('Apólices', sA.apolices, sP.apolices, 'count'),
+        kpiCard('Clientes únicos', sA.clientesUnicos, sP.clientesUnicos, 'count'),
+      ]
+    },
+    {
+      title: 'Novo × Renovação', cards: [
+        kpiCard('Prêmio novo', sA.premioNovo, sP.premioNovo, 'money'),
+        kpiCard('Prêmio renovação', sA.premioRenov, sP.premioRenov, 'money'),
+        // Único card da aba ancorado no TÉRMINO de vigência (o resto usa o início) —
+        // daí o tooltip: sem ele o número parece incoerente com os vizinhos.
+        kpiCard('Taxa de renovação', fA.taxa || 0, fP2.taxa || 0, 'pct', {
+          na: fA.base === 0,
+          // Sem base no período anterior não há variação a exibir — o badge viraria
+          // "▲ 100%" contra um zero que não existe.
+          naCompare: fP2.base === 0,
+          title: 'Apólices (sem endossos) de negócio novo ou renovação cujo término de vigência '
+            + 'caiu no período: quantas foram Renovadas ÷ (Renovadas + Vencidas). '
+            + 'Canceladas, Suspensas e Perda Total ficam fora da base — saíram no meio da '
+            + 'vigência, não eram candidatas a renovar. Recorte por término de vigência, '
+            + 'diferente dos demais cards, que usam o início.',
+          footExtra: () => fA.base === 0
+            ? 'nada venceu no período'
+            : `${fN(fA.renovadas)} renov. · ${fN(fA.vencidas)} venc. · ant. ${fP2.base ? fPct2(fP2.taxa) : '—'}`
+        }),
+        // "maior" mix novo não é bom nem ruim por si só (depende da estratégia) — cor neutra.
+        kpiCard('Mix novo', sA.mixNovo, sP.mixNovo, 'pct', { neutral: true }),
+      ]
+    },
+    {
+      title: 'Eficiência & risco', cards: [
+        kpiCard('Ticket médio', sA.ticketMedio, sP.ticketMedio, 'money'),
+        kpiCard('Comissão média (%)', sA.comMediaPct, sP.comMediaPct, 'pct'),
+        kpiCard('Taxa de churn', sA.taxaChurn, sP.taxaChurn, 'pct', {
+          lowerIsBetter: true,
+          footExtra: (delta, deltaTxt) => `${fN(sA.cancelQtd)} canc. · ${fN(sP.cancelQtd)} ant. · Δ ${deltaTxt}`
+        }),
+        kpiCard('Prêmio em risco', sA.premioRisco, sP.premioRisco, 'money', {
+          lowerIsBetter: true,
+          footExtra: (delta, deltaTxt) => `${fN(sA.canceladasQtd)} canc. · ant. ${fBRL(sP.premioRisco)} · Δ ${deltaTxt}`
+        }),
+      ]
+    },
+    {
+      title: 'Cobertura', cards: [
+        kpiCard('Produtores ativos', sA.produtoresAtivos, sP.produtoresAtivos, 'count'),
+        kpiCard('Seguradoras ativas', sA.seguradorasAtivas, sP.seguradorasAtivas, 'count'),
+        kpiCard('Ramos ativos', sA.ramosAtivos, sP.ramosAtivos, 'count'),
+        kpiCard('Endossos (EN + ER)', sA.endossos, sP.endossos, 'count'),
+      ]
+    },
+  ];
 
-  document.getElementById('comp-kpis-grid').innerHTML = [
-    compCard('Cancelamentos (CN + CR)', sA.cancelQtd, sP.cancelQtd, fN, true),
-    compCard('Endossos (EN + ER)', sA.endossosQtd, sP.endossosQtd, fN),
-    compCard('Clientes únicos', sA.cliUnicos, sP.cliUnicos, fN),
-    compCard('Ticket médio', sA.ticket, sP.ticket, fBRL),
-    compCard('Comissão média (%)', sA.pctCom, sP.pctCom, fPct2),
-    compCard('Taxa de churn', sA.taxaChurn, sP.taxaChurn, fPct2, true),
-    compCard('Prêmio em risco (canceladas)', sA.premioRisco, sP.premioRisco, fBRL, true),
-    compCard('Renovações (tipo R)', sA.renovQtd, sP.renovQtd, fN),
-    compCard('Novos produtores ativos (tipo N)', sA.prodAtivos, sP.prodAtivos, fN),
-  ].join('');
+  document.getElementById('comp-kpis-grid').innerHTML = blocks.map(b => `
+    <div class="kpi-comp-block">
+      <div class="kpi-comp-block-title">${b.title}</div>
+      <div class="kpi-comp-grid">${b.cards.join('')}</div>
+    </div>`).join('');
+
+}
+
+// ── Maiores variações — ranking por produtor/seguradora/ramo ────────────────────
+// Agrupa prêmio ou comissão de TIPOS_PROD por dimensão escolhida, separando novo
+// (N+EN) de renovação (R+ER), e ordena pelo Δ absoluto do total (quem mais
+// cresceu/caiu). União das chaves dos dois períodos, ausente = 0.
+function getCompRankData(dataAtual, dataPrev, dim, metricField) {
+  const TIPOS_PROD = ['N', 'R', 'ER', 'EN'];
+  const agg = data => {
+    const map = new Map();
+    data.forEach(r => {
+      if (!TIPOS_PROD.includes(r.tipo)) return;
+      const key = r[dim] || 'Sem informação';
+      if (!map.has(key)) map.set(key, { novo: 0, renov: 0, total: 0 });
+      const e = map.get(key);
+      const v = r[metricField] || 0;
+      if (r.tipo === 'N' || r.tipo === 'EN') e.novo += v;
+      else if (r.tipo === 'R' || r.tipo === 'ER') e.renov += v;
+      e.total += v;
+    });
+    return map;
+  };
+  const mapA = agg(dataAtual), mapP = agg(dataPrev);
+  const keys = new Set([...mapA.keys(), ...mapP.keys()]);
+  const zero = { novo: 0, renov: 0, total: 0 };
+  const rows = [...keys].map(key => {
+    const a = mapA.get(key) || zero, p = mapP.get(key) || zero;
+    return { key, a, p, deltaTotal: a.total - p.total };
+  });
+  rows.sort((r1, r2) => r2.deltaTotal - r1.deltaTotal);
+  return rows;
+}
+
+// Badge de Δ% reaproveitando .kpi-comp-trend/.trend-*. vP=0 e vA>0 vira "novo" em vez
+// de 100%/Infinity enganoso; ambos 0 vira "—".
+function compRankDeltaBadge(vA, vP) {
+  if (vA === 0 && vP === 0) return `<span class="kpi-comp-trend trend-neutral">—</span>`;
+  if (vP === 0) return `<span class="kpi-comp-trend trend-up">novo</span>`;
+  const diff = ((vA - vP) / Math.abs(vP)) * 100;
+  const cls = diff > 0.1 ? 'trend-up' : diff < -0.1 ? 'trend-down' : 'trend-neutral';
+  const txt = (diff > 0 ? '+' : '') + diff.toFixed(1) + '%';
+  return `<span class="kpi-comp-trend ${cls}">${txt}</span>`;
+}
+
+function onCompRankDimChange(val) { compRankDim = val; renderCompRankTable(); }
+function onCompRankMetricChange(val) { compRankMetric = val; renderCompRankTable(); }
+
+function renderCompRankTable() {
+  const wrap = document.getElementById('comp-rank-wrap');
+  const counter = document.getElementById('comp-rank-counter');
+  if (!wrap || !_compLastData) return;
+  const { atual, prev } = _compLastData;
+  const dimLabels = { colab: 'Produtor', seg: 'Seguradora', ramo: 'Ramo' };
+  const rows = getCompRankData(atual, prev, compRankDim, compRankMetric);
+
+  if (!rows.length) {
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px">Nenhum dado para o filtro atual.</div>';
+    if (counter) counter.textContent = '';
+    return;
+  }
+
+  // Recorta pelos 25 MAIORES movimentos em módulo (não pelo topo do ranking com sinal):
+  // cortar por Δ assinado descartaria justamente as maiores quedas, que é metade da
+  // informação que se procura aqui. Depois reordena por Δ com sinal — cresceu em cima,
+  // caiu embaixo.
+  const LIMIT = 25;
+  const shown = rows.length > LIMIT
+    ? [...rows].sort((r1, r2) => Math.abs(r2.deltaTotal) - Math.abs(r1.deltaTotal))
+      .slice(0, LIMIT)
+      .sort((r1, r2) => r2.deltaTotal - r1.deltaTotal)
+    : rows;
+
+  const thead = `<thead><tr>
+      <th style="text-align:left">${dimLabels[compRankDim]}</th>
+      <th class="num">Novo atual</th><th class="num">Novo anterior</th><th class="num">Δ% novo</th>
+      <th class="num">Renov. atual</th><th class="num">Renov. anterior</th><th class="num">Δ% renov.</th>
+      <th class="num">Total atual</th><th class="num">Total anterior</th><th class="num">Δ% total</th>
+    </tr></thead>`;
+
+  const tbody = shown.map(r => `<tr>
+      <td class="name-cell">${escHtml(r.key)}</td>
+      <td class="num">${fBRL(r.a.novo)}</td><td class="num">${fBRL(r.p.novo)}</td><td class="num">${compRankDeltaBadge(r.a.novo, r.p.novo)}</td>
+      <td class="num">${fBRL(r.a.renov)}</td><td class="num">${fBRL(r.p.renov)}</td><td class="num">${compRankDeltaBadge(r.a.renov, r.p.renov)}</td>
+      <td class="num">${fBRL(r.a.total)}</td><td class="num">${fBRL(r.p.total)}</td><td class="num">${compRankDeltaBadge(r.a.total, r.p.total)}</td>
+    </tr>`).join('');
+
+  wrap.innerHTML = `<table class="ret-table" id="comp-rank-table">${thead}<tbody>${tbody}</tbody></table>`;
+  if (counter) counter.textContent = rows.length > LIMIT
+    ? `Mostrando as ${shown.length} maiores variações de ${rows.length}`
+    : '';
 }
 
 window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change', () => {

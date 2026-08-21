@@ -187,7 +187,7 @@
     /* Stats */
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
       margin-bottom: 1.5rem;
     }
@@ -286,6 +286,18 @@
       background: rgba(239, 68, 68, 0.1);
       border: 1px solid rgba(239, 68, 68, 0.3);
       color: #f87171;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+    }
+
+    .badge-neutral {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg4);
+      border: 1px solid var(--border2);
+      color: var(--text2);
       border-radius: 4px;
       padding: 3px 8px;
       font-size: 11px;
@@ -588,6 +600,67 @@
       </div>
     </div>
 
+    <!-- Registro de contatos GHL — visível em todas as etapas -->
+    <div class="card" id="registry-card">
+      <div class="card-header">
+        <h2>Base de contatos GHL <span class="pill pill-green" id="reg-count">0 contatos</span></h2>
+        <span style="font-size: 12px; color: var(--text3)" id="reg-updated"></span>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" id="reg-hint" style="margin-bottom: 14px;">
+          Carregue aqui o <strong>export de contatos do GHL</strong> (com a coluna CPF/CNPJ). Os IDs ficam salvos
+          neste navegador e são reaproveitados nas próximas conversões para vincular a oportunidade ao contato
+          existente, em vez de criar um duplicado.
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <button class="btn btn-primary" onclick="document.getElementById('reg-file').click()">⬆ Carregar export de
+            contatos</button>
+          <button class="btn btn-ghost" onclick="exportRegistry()">💾 Backup JSON</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('reg-json').click()">📥 Restaurar JSON</button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost" onclick="clearRegistry()">🗑 Limpar base</button>
+        </div>
+        <input type="file" id="reg-file" accept=".csv" style="display: none">
+        <input type="file" id="reg-json" accept=".json,application/json" style="display: none">
+        <div class="footer-note" id="reg-status"></div>
+      </div>
+    </div>
+
+    <!-- Mapeamentos aprendidos — correções manuais de ramos/seguradoras/tipos/colaboradores,
+         guardadas neste navegador para não repetir o mesmo ajuste a cada planilha -->
+    <div class="card" id="learned-card">
+      <div class="card-header">
+        <h2>Mapeamentos aprendidos <span class="pill pill-green" id="learned-count">nenhum ainda</span></h2>
+        <span style="font-size: 12px; color: var(--text3)" id="learned-updated"></span>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom: 14px;">
+          Toda correção feita à mão nas abas Ramos, Seguradoras, Tipo de negócio e Colaboradores é salva aqui e
+          reaplicada automaticamente na próxima planilha, antes das regras automáticas — sem refazer o mesmo ajuste.
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
+          <input type="text" class="search-input" placeholder="Filtrar..." id="search-learned"
+            oninput="renderLearnedTable()">
+          <span style="font-size: 12px; color: var(--text3)" id="learned-breakdown"></span>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost" onclick="clearLearned()">🗑 Limpar aprendizado</button>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="map-table" id="table-learned">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Original</th>
+                <th>Valor aprendido</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- STEP 1: Upload -->
     <div id="section-upload">
       <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
@@ -608,8 +681,12 @@
           <div class="stat-value" id="stat-total">0</div>
         </div>
         <div class="stat">
-          <div class="stat-label">Com telefone</div>
-          <div class="stat-value green" id="stat-phone">0</div>
+          <div class="stat-label">Contatos vinculados</div>
+          <div class="stat-value green" id="stat-linked">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Contatos novos</div>
+          <div class="stat-value yellow" id="stat-new">0</div>
         </div>
         <div class="stat">
           <div class="stat-label">Ramos não mapeados</div>
@@ -638,6 +715,8 @@
                 id="tab-badge-tipos">0</span></div>
             <div class="tab" onclick="switchTab('colabs')">Colaboradores <span class="count-badge warn"
                 id="tab-badge-colabs">0</span></div>
+            <div class="tab" onclick="switchTab('contatos')">Contatos <span class="count-badge warn"
+                id="tab-badge-contatos">0</span></div>
           </div>
 
           <div class="tab-content active" id="tab-ramos">
@@ -651,6 +730,7 @@
               <table class="map-table" id="table-ramos">
                 <thead>
                   <tr>
+                    <th title="Desmarque para deixar estas linhas fora do CSV">Exportar</th>
                     <th>Produto (original)</th>
                     <th>Qtd</th>
                     <th>Ramo GHL</th>
@@ -717,10 +797,41 @@
               <table class="map-table" id="table-colabs">
                 <thead>
                   <tr>
+                    <th title="Desmarque para deixar estas linhas fora do CSV">Exportar</th>
                     <th>Colaborador (original)</th>
                     <th>Qtd</th>
                     <th>ID GHL (Opportunity Owner)</th>
                     <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-contatos">
+            <div class="section-title">Vínculo com contatos já existentes no GHL</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap;">
+              <input type="text" class="search-input" placeholder="Filtrar clientes..." id="search-contatos"
+                oninput="renderContactsTable()">
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer;">
+                <input type="checkbox" id="only-pending" onchange="renderContactsTable()"> Só os não vinculados
+              </label>
+              <span style="font-size: 12px; color: var(--text3)" id="contatos-count-label"></span>
+            </div>
+            <div id="contatos-empty" class="alert alert-warn hidden">
+              A base de contatos está vazia. Carregue o export do GHL no painel acima — sem ele, toda oportunidade
+              vira um contato novo.
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="map-table" id="table-contatos">
+                <thead>
+                  <tr>
+                    <th>Cliente (relatório)</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Linhas</th>
+                    <th>Vínculo</th>
+                    <th>Contact Id</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -734,7 +845,44 @@
       <div class="card">
         <div class="card-header">
           <h2>Prévia dos dados <span class="pill pill-blue" id="preview-count">0 linhas</span></h2>
-          <span style="font-size: 12px; color: var(--text3)">Primeiros 10 registros</span>
+          <span style="font-size: 12px; color: var(--text3)" id="preview-scope-label">Primeiros 10 registros</span>
+        </div>
+        <div class="card-body" style="padding-bottom: 0;">
+          <div id="preview-dup-alert" class="alert alert-warn hidden"></div>
+          <!-- Filtros de diagnóstico — cada um mostra a contagem mesmo desmarcado,
+               para a prévia funcionar como raio-x da planilha, não só uma amostra. -->
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer;">
+              <input type="checkbox" id="filter-sem-telefone" onchange="renderPreview()"> Sem telefone
+              <span class="count-badge" id="count-sem-telefone">0</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer;">
+              <input type="checkbox" id="filter-sem-owner" onchange="renderPreview()"> Sem Opportunity Owner
+              <span class="count-badge" id="count-sem-owner">0</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer;">
+              <input type="checkbox" id="filter-valor-zero" onchange="renderPreview()"> Valor zerado/vazio
+              <span class="count-badge" id="count-valor-zero">0</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer;">
+              <input type="checkbox" id="filter-sem-contato" onchange="renderPreview()"> Sem contato vinculado
+              <span class="count-badge" id="count-sem-contato">0</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer;">
+              <input type="checkbox" id="filter-duplicadas" onchange="renderPreview()"> Duplicadas
+              <span class="count-badge" id="count-duplicadas">0</span>
+            </label>
+            <div class="spacer"></div>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2);">
+              Mostrar
+              <select class="select-map" id="preview-limit" style="width: auto;" onchange="renderPreview()">
+                <option value="10">10</option>
+                <option value="50">50</option>
+                <option value="200">200</option>
+                <option value="all">Todas</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div class="card-body" style="padding: 0;">
           <div class="preview-wrap">
@@ -793,22 +941,36 @@
       "YELUM SEGURADORA", "ZURICH MINAS BRASIL SEGUROS S/A"
     ];
 
+    // Nome do colaborador no relatório → ID GHL (Opportunity Owner).
+    // Há apelidos apontando para o mesmo ID: os relatórios nem sempre trazem o
+    // nome completo. O <select> da aba Colaboradores mostra todas as chaves.
     const COLAB_MAP = {
       "CELSO LUIS SANTOLIN": "AeuzaS0n4T4GLrVQ9Fvv",
       "CESAR AUGUSTO SANTOLIN": "mwdxWiYxOdGrPzRUAgwL",
       "DENISE SOUZA": "hbNS9Km21rPzSAwD9WiN",
+      "DENISE CHRISTO DE SOUZA": "hbNS9Km21rPzSAwD9WiN",
       "DIEGO CHEMIN": "mDrtR7nkqXJ6AID7OuFy",
+      "ERIC SAMPAIO": "cemTvJjz1u3z6STYuPAJ",
       "FERNANDO DE PAULA SERAFIM": "zr1oxzVxjh1nU0rIOnYc",
+      "FERNANDO SERAFIM": "zr1oxzVxjh1nU0rIOnYc",
       "GABRIEL DA SILVA VERAS": "TRicGh0ZjlJWZYmltRjD",
+      "GABRIEL VERAS": "TRicGh0ZjlJWZYmltRjD",
       "GABRIELA MOZERLE": "LMH8JJDPLa3ldHpmwtay",
+      "GABRIELA ALENCAR": "LMH8JJDPLa3ldHpmwtay",
+      "GABRIELA ALENCAR MOZERLE": "LMH8JJDPLa3ldHpmwtay",
       "GABRIELLE WITT": "JkYWUBdPtpSxoVfnq6Xn",
       "GUSTAVO HENRIQUE GUIMARÃES VIEIRA": "tOtDuGdDkdqen3KKIIHj",
+      "GUSTAVO VIEIRA": "tOtDuGdDkdqen3KKIIHj",
       "HEMILY CRISTOVÃO": "PgUHa8nfLKfPnOSKuVD7",
       "LUIS CARLOS SANTOLIN": "uyz7VgNSiiKuqWctRIZH",
       "MITZRAEL TASSINARI": "266d5gh42CUG7K3L1mJ7",
+      "MITZRAEL VINICIUS TASSINARI": "266d5gh42CUG7K3L1mJ7",
       "NATHALIA LETICIA DA SILVA": "aD6HN1CRw0goTLqtWgoF",
+      "NATHÁLIA SILVA": "aD6HN1CRw0goTLqtWgoF",
       "VERA LUCIA PIRES": "KwKoiuil3SzGmpDhvMrZ",
       "VICTOR DE ANDRADES": "zIJIIMnSln5069ODWiwX",
+      "VICTOR ASSIS DE ANDRADE FERNANDES": "zIJIIMnSln5069ODWiwX",
+      "VICTOR ANDRADES": "zIJIIMnSln5069ODWiwX",
     };
 
 
@@ -816,6 +978,9 @@
     // mais específicas vêm antes das genéricas (coletivo antes de individual etc.).
     const RAMO_RULES = [
       [/rc[\s-]*prof/i, "Responsabilidade Civil Profissional"],
+      // Bike não tem ramo próprio na nomenclatura oficial. Vem antes das regras
+      // genéricas para que "BIKE EMPRESARIAL" não caia em Compreensivo Empresarial.
+      [/\bbike\b|bicicleta/i, "Riscos Diversos"],
       [/residencia|residencial/i, "Compreensivo Residencial"],
       // Só há ramo odontológico coletivo; 'ODONTO INDIVIDUAL' fica sem regra de
       // propósito, para ser mapeado à mão.
@@ -932,6 +1097,464 @@
       return null;
     }
 
+    // ── REGISTRO DE CONTATOS GHL ────────────────────────────────────────────
+    // O relatório do Quiver não traz o ID do contato no GHL. Sem ele, cada
+    // importação cria contatos duplicados. Este registro guarda localmente o
+    // Contact Id de cada contato — alimentado pelo export de contatos do GHL —
+    // indexado por CPF/CNPJ e por nome normalizado, e é consultado na hora de
+    // montar cada linha do CSV.
+    const REG_KEY = 'ghl_conv_registry_v1';
+
+    let registry = { version: 1, updatedAt: null, contacts: {} };
+    let idxDoc = {};        // documento normalizado -> uuid
+    let idxName = {};       // nome normalizado -> [uuid, ...]
+    let docConflicts = [];  // documentos apontando para mais de um contato
+    let manualLink = {};    // clientKey -> uuid definido à mão nesta sessão
+
+    // ── MAPEAMENTOS APRENDIDOS ───────────────────────────────────────────────
+    // Guarda, por tipo, só as correções que o usuário fez à mão nas abas de
+    // De/Para. Na próxima planilha, `processData()` consulta este objeto antes
+    // do auto-map por regex/dicionário — assim o mesmo ajuste não precisa ser
+    // refeito a cada conversão.
+    const LEARN_KEY = 'ghl_conv_learn_v1';
+    let learned = { version: 1, updatedAt: null, ramos: {}, segs: {}, tipos: {}, colabs: {} };
+
+    function escapeHtml(v) {
+      return String(v ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Normaliza CPF/CNPJ para só dígitos.
+    // O Quiver emite CNPJ com um zero à esquerda a mais ("010.862.833/0001-15",
+    // 15 dígitos, quando o CNPJ real tem 14). Planilhas que perderam a
+    // formatação também chegam sem os zeros à esquerda.
+    function normDoc(val) {
+      let d = String(val ?? '').replace(/\D/g, '');
+      if (!d) return '';
+      if (d.length === 15 && d[0] === '0') d = d.slice(1);
+      if (d.length === 11 || d.length === 14) return d;
+      if (d.length === 12 || d.length === 13) return d.padStart(14, '0');
+      if (d.length >= 8 && d.length <= 10) return d.padStart(11, '0');
+      return '';
+    }
+
+    function stripAccents(s) {
+      return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    // Chave de nome: maiúsculas, sem acento, sem pontuação, espaços colapsados.
+    function normName(val) {
+      return stripAccents(val).toUpperCase()
+        .replace(/[^A-Z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    // Variante sem sufixo societário — o GHL nem sempre guarda a razão social
+    // completa ("CLINICA X LTDA EPP" no Quiver vs "Clinica X" no GHL).
+    const SUFIXO_PJ = /\b(LTDA|LTD|EPP|EIRELI|MEI|ME|SA|SS|SC|CIA|S\sA|S\sC)\b/g;
+    function normNameLoose(val) {
+      const s = normName(val).replace(SUFIXO_PJ, ' ').replace(/\s+/g, ' ').trim();
+      // Chave curta demais vira ruído e casaria com qualquer coisa.
+      return s.length >= 4 ? s : '';
+    }
+
+    function nameKeysFor(name, business) {
+      const out = new Set();
+      [name, business].forEach(v => {
+        const k = normName(v);
+        if (k) out.add(k);
+        const kl = normNameLoose(v);
+        if (kl) out.add(kl);
+      });
+      return [...out];
+    }
+
+    // O GRUPO DE PRODUÇÃO diz quem renova a carteira de quem: "VICTOR | GUSTAVO"
+    // é o Victor renovando os seguros do Gustavo. Em regra a oportunidade fica
+    // com quem renova — que é o que a coluna COLABORADOR já traz — e o grupo em
+    // si segue indo para o CRM no campo `grpproducao`.
+    //
+    // As exceções abaixo são carteiras que trocaram de mão: o Victor não renova
+    // mais as do Gustavo nem as do Gabriel, então nesses dois grupos o dono da
+    // oportunidade é o titular da carteira, não quem aparece como colaborador.
+    // Chave normalizada em GRUPO_OWNER (sem acento, maiúscula, espaço colapsado).
+    const GRUPO_OWNER_OVERRIDE = {
+      "VICTOR | GUSTAVO - SOU MÉDICO": COLAB_MAP["GUSTAVO VIEIRA"],
+      "VICTOR | GABRIEL - SOU MÉDICO": COLAB_MAP["GABRIEL VERAS"],
+    };
+
+    // O relatório traz o colaborador com o grupo colado no fim
+    // ("CELSO LUIS SANTOLIN - SANTOLIN"). O dono da oportunidade é a pessoa;
+    // o grupo já vai em `grpproducao`.
+    function colabKey(val) {
+      return String(val || '').trim().toUpperCase().split(/\s+-\s+/)[0].trim();
+    }
+
+    // UUID -> nome legível. Usa a primeira chave do COLAB_MAP que aponta para o
+    // id, já que várias (apelidos) apontam para o mesmo.
+    const COLAB_NOMES = {};
+    Object.entries(COLAB_MAP).forEach(([nome, id]) => {
+      if (!COLAB_NOMES[id]) COLAB_NOMES[id] = nome;
+    });
+
+    function nomeDoOwner(id) {
+      if (!id) return '';
+      return COLAB_NOMES[id] || id;
+    }
+
+    function grupoKey(val) {
+      return stripAccents(val).toUpperCase().replace(/\s+/g, ' ').trim();
+    }
+
+    const GRUPO_OWNER = {};
+    Object.entries(GRUPO_OWNER_OVERRIDE).forEach(([g, id]) => { GRUPO_OWNER[grupoKey(g)] = id; });
+
+    // Dono da oportunidade: exceção por grupo de produção primeiro, colaborador
+    // depois. Isolada aqui para poder ser testada sem montar uma linha inteira.
+    function resolveOwner(row) {
+      const override = GRUPO_OWNER[grupoKey(row[columns.grupoProd])];
+      if (override) return override;
+      const mapped = colabMap[colabKey(row[columns.colaborador])];
+      return (mapped && mapped !== '__UNMAPPED__') ? mapped : '';
+    }
+
+    function clientKeyOf(cliente, doc) {
+      if (doc) return 'D:' + doc;
+      const k = normName(cliente);
+      return k ? 'N:' + k : '';
+    }
+
+    function loadRegistry() {
+      try {
+        const raw = localStorage.getItem(REG_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.contacts) registry = parsed;
+        }
+      } catch (e) {
+        console.warn('Registro de contatos ilegível — começando vazio.', e);
+      }
+      rebuildIndexes();
+    }
+
+    function saveRegistry() {
+      registry.updatedAt = new Date().toISOString();
+      try {
+        localStorage.setItem(REG_KEY, JSON.stringify(registry));
+        return true;
+      } catch (e) {
+        alert('Não foi possível salvar o registro no navegador (espaço esgotado?).\n'
+          + 'Use "Backup JSON" para não perder o que já foi carregado.');
+        return false;
+      }
+    }
+
+    function loadLearned() {
+      try {
+        const raw = localStorage.getItem(LEARN_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed) {
+            learned = {
+              version: 1,
+              updatedAt: parsed.updatedAt || null,
+              ramos: parsed.ramos || {},
+              segs: parsed.segs || {},
+              tipos: parsed.tipos || {},
+              colabs: parsed.colabs || {},
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Mapeamentos aprendidos ilegíveis — começando vazio.', e);
+      }
+    }
+
+    function saveLearned() {
+      learned.updatedAt = new Date().toISOString();
+      try {
+        localStorage.setItem(LEARN_KEY, JSON.stringify(learned));
+        return true;
+      } catch (e) {
+        alert('Não foi possível salvar os mapeamentos aprendidos no navegador (espaço esgotado?).\n'
+          + 'Use "Backup JSON" para não perder o que já foi ajustado.');
+        return false;
+      }
+    }
+
+    // Resolve o auto-map "puro" (regra/dicionário) de uma chave, sem olhar o
+    // aprendizado — usado quando um item aprendido é removido, para saber para
+    // onde ele deve voltar.
+    function autoMapFor(type, key) {
+      if (type === 'ramos') return autoMapRamo(key);
+      if (type === 'segs') return autoMapSeg(key);
+      if (type === 'tipos') return autoMapTipo(key);
+      if (type === 'colabs') return COLAB_MAP[key] || null;
+      return null;
+    }
+
+    // Grava SÓ a escolha manual do usuário — nunca o resultado do auto-map.
+    // Se gravássemos o auto-map aqui, uma correção futura nas regras (RAMO_RULES,
+    // SEG_RULES etc.) nunca teria efeito, porque o valor aprendido antigo sempre
+    // venceria a regra nova.
+    function learnMap(type, original, value) {
+      const bucket = learned[type];
+      if (!bucket) return;
+      if (!value || value === '__UNMAPPED__') {
+        if (original in bucket) {
+          delete bucket[original];
+          saveLearned();
+          renderLearnedTable();
+          renderLearnedCard();
+        }
+        return;
+      }
+      if (bucket[original] !== value) {
+        bucket[original] = value;
+        saveLearned();
+        renderLearnedTable();
+        renderLearnedCard();
+      }
+    }
+
+    function removeLearned(type, original) {
+      if (!learned[type] || !(original in learned[type])) return;
+      delete learned[type][original];
+      saveLearned();
+      renderLearnedTable();
+      renderLearnedCard();
+      // Se a planilha carregada ainda usa essa chave, o item some do aprendizado
+      // mas não pode ficar "mapeado" por engano — volta para o auto-map puro.
+      if (rawData.length) {
+        const map = getMap(type);
+        if (map && original in map) {
+          map[original] = autoMapFor(type, original) || '__UNMAPPED__';
+          renderMappingTable(type);
+          updateStats();
+          renderPreview();
+        }
+      }
+    }
+
+    function countLearned() {
+      return ['ramos', 'segs', 'tipos', 'colabs']
+        .reduce((sum, t) => sum + Object.keys(learned[t] || {}).length, 0);
+    }
+
+    function clearLearned() {
+      const total = countLearned();
+      if (!total) return;
+      if (!confirm(`Apagar os ${total} mapeamento(s) aprendido(s) neste navegador?\n\n`
+        + 'A próxima planilha volta a usar só o auto-map por regra/dicionário. '
+        + 'As escolhas já aplicadas na planilha aberta agora não são desfeitas.')) return;
+      learned = { version: 1, updatedAt: null, ramos: {}, segs: {}, tipos: {}, colabs: {} };
+      localStorage.removeItem(LEARN_KEY);
+      renderLearnedTable();
+      renderLearnedCard();
+    }
+
+    const LEARN_TYPE_LABEL = { ramos: 'Ramo', segs: 'Seguradora', tipos: 'Tipo', colabs: 'Colaborador' };
+
+    function renderLearnedTable() {
+      const tbody = document.querySelector('#table-learned tbody');
+      if (!tbody) return;
+      const filter = (document.getElementById('search-learned').value || '').toLowerCase();
+
+      const rows = [];
+      Object.keys(LEARN_TYPE_LABEL).forEach(type => {
+        Object.entries(learned[type] || {}).forEach(([original, value]) => {
+          rows.push({ type, original, value });
+        });
+      });
+      const filtered = rows.filter(r => !filter
+        || r.original.toLowerCase().includes(filter)
+        || String(r.value).toLowerCase().includes(filter));
+
+      tbody.innerHTML = '';
+      filtered.forEach(r => {
+        // Mesma dupla escapada de renderMappingTable: como string JS (vai dentro
+        // de um onclick="...") e como HTML, senão uma chave com aspas quebra o atributo.
+        const safeKey = escapeHtml(r.original.replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+      <td><span class="badge-neutral">${LEARN_TYPE_LABEL[r.type]}</span></td>
+      <td><span class="tag-original">${escapeHtml(r.original)}</span></td>
+      <td>${escapeHtml(r.value)}</td>
+      <td><button class="btn btn-ghost" style="padding:4px 10px" onclick="removeLearned('${r.type}','${safeKey}')">✕</button></td>
+    `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderLearnedCard() {
+      const counts = Object.keys(LEARN_TYPE_LABEL).map(t => Object.keys(learned[t] || {}).length);
+      const total = counts.reduce((a, b) => a + b, 0);
+      document.getElementById('learned-count').textContent = total ? `${total} itens` : 'nenhum ainda';
+      document.getElementById('learned-breakdown').textContent = Object.keys(LEARN_TYPE_LABEL)
+        .map((t, i) => `${counts[i]} ${LEARN_TYPE_LABEL[t].toLowerCase()}(s)`).join(' · ');
+      document.getElementById('learned-updated').textContent = learned.updatedAt
+        ? 'Atualizado em ' + new Date(learned.updatedAt).toLocaleString('pt-BR')
+        : '';
+    }
+
+    function rebuildIndexes() {
+      idxDoc = {};
+      idxName = {};
+      docConflicts = [];
+      Object.values(registry.contacts).forEach(c => {
+        if (c.doc) {
+          if (idxDoc[c.doc] && idxDoc[c.doc] !== c.id) docConflicts.push(c.doc);
+          idxDoc[c.doc] = c.id;
+        }
+        (c.keys || []).forEach(k => {
+          if (!idxName[k]) idxName[k] = [];
+          if (!idxName[k].includes(c.id)) idxName[k].push(c.id);
+        });
+      });
+      docConflicts = [...new Set(docConflicts)];
+    }
+
+    function upsertContact(c) {
+      if (!c || !c.id) return null;
+      const prev = registry.contacts[c.id] || {};
+      const keys = new Set(prev.keys || []);
+      nameKeysFor(c.name, c.business).forEach(k => keys.add(k));
+      registry.contacts[c.id] = {
+        id: c.id,
+        name: c.name || prev.name || '',
+        business: c.business || prev.business || '',
+        doc: normDoc(c.doc) || prev.doc || '',
+        source: c.source || prev.source || 'export',
+        keys: [...keys],
+      };
+      return registry.contacts[c.id];
+    }
+
+    // ── Leitura do export de contatos do GHL ────────────────────────────────
+    function parseCSV(text, delim) {
+      const d = delim || ',';
+      const rows = [];
+      let row = [], cur = '', inQ = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQ) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') { cur += '"'; i++; }
+            else inQ = false;
+          } else cur += ch;
+        } else if (ch === '"') inQ = true;
+        else if (ch === d) { row.push(cur); cur = ''; }
+        else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+        else if (ch !== '\r') cur += ch;
+      }
+      if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+      return rows.filter(r => r.some(v => String(v).trim() !== ''));
+    }
+
+    // Abrir e salvar o CSV do GHL no Excel pt-BR embrulha a linha inteira num
+    // único campo e acrescenta ';;;;'. Desfaz isso para o arquivo não chegar
+    // aqui com uma coluna só.
+    function unwrapExcelMangled(text) {
+      const first = text.split(/\r?\n/).find(l => l.trim());
+      if (!first || !/^\s*"/.test(first) || !/;\s*$/.test(first)) return text;
+      return text.split(/\r?\n/)
+        .map(line => (line.trim() ? (parseCSV(line, ';')[0] || [''])[0] : ''))
+        .join('\n');
+    }
+
+    function findCol(header, ...terms) {
+      const norm = header.map(h => String(h).trim().toLowerCase());
+      for (const t of terms) {
+        const i = norm.indexOf(t.toLowerCase());
+        if (i >= 0) return i;
+      }
+      for (const t of terms) {
+        const i = norm.findIndex(h => h.includes(t.toLowerCase()));
+        if (i >= 0) return i;
+      }
+      return -1;
+    }
+
+    function ingestContactsCsv(text) {
+      const rows = parseCSV(unwrapExcelMangled(text.replace(/^\uFEFF/, '')));
+      if (rows.length < 2) return { erro: 'Arquivo vazio ou sem linhas de dados.' };
+
+      const header = rows[0];
+      const col = {
+        id: findCol(header, 'contact id', 'contactid', 'id'),
+        first: findCol(header, 'first name'),
+        last: findCol(header, 'last name'),
+        business: findCol(header, 'business name'),
+        doc: findCol(header, 'cpf/cnpj', 'cpf', 'cnpj', 'documento'),
+      };
+      if (col.id < 0) {
+        return { erro: 'Não encontrei a coluna "Contact Id". Exporte os contatos pelo GHL sem renomear as colunas.' };
+      }
+
+      const antes = Object.keys(registry.contacts).length;
+      let comDoc = 0, semChave = 0;
+      const cell = (r, i) => (i >= 0 ? String(r[i] ?? '').trim() : '');
+
+      rows.slice(1).forEach(r => {
+        const id = cell(r, col.id);
+        if (!id) return;
+        const nome = [cell(r, col.first), cell(r, col.last)].filter(Boolean).join(' ');
+        const business = cell(r, col.business);
+        const doc = normDoc(cell(r, col.doc));
+        if (!doc && !normName(nome) && !normName(business)) { semChave++; return; }
+        if (doc) comDoc++;
+        upsertContact({ id, name: nome, business, doc, source: 'export' });
+      });
+
+      saveRegistry();
+      rebuildIndexes();
+      const depois = Object.keys(registry.contacts).length;
+      return {
+        lidos: rows.length - 1,
+        novos: depois - antes,
+        atualizados: (rows.length - 1) - (depois - antes) - semChave,
+        comDoc,
+        semChave,
+        semColunaDoc: col.doc < 0,
+      };
+    }
+
+    // ── Vínculo ─────────────────────────────────────────────────────────────
+    // Cascata: manual → CPF/CNPJ → nome exato e único → nome sem sufixo
+    // societário. Nome com mais de um candidato NÃO vincula: é melhor deixar o
+    // GHL criar um contato novo do que pendurar a apólice no cliente errado.
+    function matchContact(cliente, docRaw) {
+      const doc = normDoc(docRaw);
+      const key = clientKeyOf(cliente, doc);
+      if (key && manualLink[key]) {
+        return { id: manualLink[key], how: 'manual', label: 'Manual' };
+      }
+      if (doc && idxDoc[doc]) {
+        return { id: idxDoc[doc], how: 'doc', label: 'CPF/CNPJ' };
+      }
+      for (const [k, rotulo] of [[normName(cliente), 'Nome exato'], [normNameLoose(cliente), 'Nome sem sufixo']]) {
+        if (!k || !idxName[k]) continue;
+        const ids = idxName[k];
+        if (ids.length === 1) return { id: ids[0], how: 'nome', label: rotulo };
+        return { id: '', how: 'ambiguo', label: `${ids.length} contatos com esse nome` };
+      }
+      return { id: '', how: 'novo', label: 'Contato novo' };
+    }
+
+    function setManualLink(clientKey, uuid, cliente, doc) {
+      if (!uuid) {
+        delete manualLink[clientKey];
+      } else {
+        manualLink[clientKey] = uuid;
+        // Grava no registro para que o próximo import já resolva sozinho.
+        upsertContact({ id: uuid, name: cliente, doc, source: 'manual' });
+        saveRegistry();
+        rebuildIndexes();
+      }
+    }
+
     function getMap(type) {
       if (type === 'ramos') return ramoMap;
       if (type === 'colabs') return colabMap;
@@ -949,6 +1572,45 @@
     let segCounts = {};
     let tipoCounts = {};
     let tipoMap = {};
+    let clientIndex = {};  // clientKey -> { cliente, doc, count }
+
+    // Ramos e colaboradores desmarcados nas abas de mapeamento: as linhas deles
+    // ficam de fora do CSV. É escolha por arquivo, NÃO entra no aprendizado da
+    // base — deixar isso persistir faria uma conversão futura descartar linhas
+    // em silêncio por causa de um clique de meses atrás.
+    let excludedRamos = new Set();
+    let excludedColabs = new Set();
+    // Donos desmarcados, derivados de `excludedColabs`. Ver ownerKeyOf().
+    let excludedOwners = new Set();
+
+    // A quem a linha pertence de fato: o mesmo valor que vai para `atribuído`.
+    // Quando o colaborador não tem correspondente no GHL, cai no nome bruto,
+    // para que desmarcar quem não é usuário do CRM continue funcionando.
+    function ownerKeyOf(row) {
+      return resolveOwner(row) || colabKey(row[columns.colaborador]);
+    }
+
+    function rebuildExcludedOwners() {
+      excludedOwners = new Set();
+      excludedColabs.forEach(k => {
+        const id = colabMap[k];
+        excludedOwners.add(id && id !== '__UNMAPPED__' ? id : k);
+      });
+    }
+
+    // O filtro de colaborador segue o PROPRIETÁRIO, não a coluna COLABORADOR do
+    // relatório. Quando o grupo de produção troca o dono (VICTOR | GABRIEL vira
+    // do Gabriel), a linha acompanha quem vai recebê-la no GHL — senão marcar
+    // "só o Victor" traria junto apólices que hoje são do Gabriel.
+    function isRowExported(row) {
+      const p = String(row[columns.produto] || '').trim().toUpperCase();
+      if (excludedRamos.has(p)) return false;
+      return !excludedOwners.has(ownerKeyOf(row));
+    }
+
+    function excludedSet(type) {
+      return type === 'ramos' ? excludedRamos : (type === 'colabs' ? excludedColabs : null);
+    }
 
     // Upload handling
     const zone = document.getElementById('upload-zone');
@@ -958,6 +1620,152 @@
     zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
     zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
     fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+    // ── Painel da base de contatos ──────────────────────────────────────────
+    document.getElementById('reg-file').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const r = ingestContactsCsv(String(ev.target.result));
+        const status = document.getElementById('reg-status');
+        if (r.erro) {
+          status.textContent = '⚠ ' + r.erro;
+        } else {
+          const partes = [
+            `${r.lidos} linha(s) lidas`,
+            `${r.novos} contato(s) novo(s)`,
+            `${r.atualizados} atualizado(s)`,
+            `${r.comDoc} com CPF/CNPJ`,
+          ];
+          if (r.semChave) partes.push(`${r.semChave} ignorado(s) por não ter nome nem documento`);
+          if (r.semColunaDoc) partes.push('⚠ o arquivo não tem coluna de CPF/CNPJ — o vínculo ficará só por nome');
+          status.textContent = partes.join(' · ');
+        }
+        renderRegistryCard();
+        if (rawData.length) { updateStats(); renderContactsTable(); renderPreview(); }
+      };
+      reader.readAsText(file, 'UTF-8');
+      e.target.value = '';
+    });
+
+    document.getElementById('reg-json').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const parsed = JSON.parse(String(ev.target.result));
+          const r = restoreBackup(parsed);
+          document.getElementById('reg-status').textContent =
+            `Backup restaurado: ${r.novosContatos} contato(s) novo(s), ${r.jaConhecidos} já conhecido(s)`
+            + (r.temLearned ? ` · ${r.learnedNovos} mapeamento(s) aprendido(s) novo(s)` : '') + '.';
+          renderRegistryCard();
+          // restoreBackup() já redesenha a tabela de aprendizado quando o backup
+          // traz "learned" — mas o card de contagem/timestamp é sempre atualizado aqui.
+          renderLearnedCard();
+          renderLearnedTable();
+          if (rawData.length) { updateStats(); renderContactsTable(); renderPreview(); }
+        } catch (err) {
+          document.getElementById('reg-status').textContent = '⚠ JSON inválido: ' + err.message;
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+      e.target.value = '';
+    });
+
+    // Restaura um backup — função pura (sem tocar no <input>) para poder ser
+    // testada isoladamente. Aceita tanto o formato novo, com "learned", quanto o
+    // formato antigo (antes da Fase 2), que só tem "contacts".
+    function restoreBackup(parsed) {
+      if (!parsed || !parsed.contacts) throw new Error('sem a chave "contacts"');
+      const antes = Object.keys(registry.contacts).length;
+      Object.values(parsed.contacts).forEach(upsertContact);
+      saveRegistry();
+      rebuildIndexes();
+      const novosContatos = Object.keys(registry.contacts).length - antes;
+      const totalContatos = Object.keys(parsed.contacts).length;
+
+      let learnedNovos = 0;
+      const temLearned = !!parsed.learned;
+      if (temLearned) {
+        ['ramos', 'segs', 'tipos', 'colabs'].forEach(type => {
+          Object.entries(parsed.learned[type] || {}).forEach(([k, v]) => {
+            if (!(k in learned[type])) learnedNovos++;
+            learned[type][k] = v;
+          });
+        });
+        saveLearned();
+        renderLearnedTable();
+        renderLearnedCard();
+      }
+
+      return {
+        novosContatos,
+        jaConhecidos: totalContatos - novosContatos,
+        learnedNovos,
+        temLearned,
+      };
+    }
+
+    function exportRegistry() {
+      const total = Object.keys(registry.contacts).length;
+      const totalLearned = countLearned();
+      if (!total && !totalLearned) { alert('A base está vazia — não há o que salvar.'); return; }
+      // Backup unificado: contatos + mapeamentos aprendidos no mesmo arquivo.
+      const backup = { ...registry, learned };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `contatos_ghl_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    function clearRegistry() {
+      const total = Object.keys(registry.contacts).length;
+      if (!total) return;
+      if (!confirm(`Apagar os ${total} contato(s) salvos neste navegador?\n\n`
+        + 'Isso não afeta o GHL, mas o vínculo automático para de funcionar até você carregar o export de novo. '
+        + 'Se ainda não tem backup, cancele e clique em "Backup JSON" antes.')) return;
+      registry = { version: 1, updatedAt: null, contacts: {} };
+      manualLink = {};
+      localStorage.removeItem(REG_KEY);
+      rebuildIndexes();
+      renderRegistryCard();
+      document.getElementById('reg-status').textContent = 'Base apagada.';
+      if (rawData.length) { updateStats(); renderContactsTable(); renderPreview(); }
+    }
+
+    function renderRegistryCard() {
+      const total = Object.keys(registry.contacts).length;
+      const comDoc = Object.values(registry.contacts).filter(c => c.doc).length;
+      document.getElementById('reg-count').textContent =
+        total ? `${total} contatos · ${comDoc} com CPF/CNPJ` : 'base vazia';
+      // O localStorage costuma ter teto de ~5 MB — vale avisar antes de estourar.
+      const bytes = (localStorage.getItem(REG_KEY) || '').length;
+      const mb = bytes / 1048576;
+      const espaco = bytes ? ` · ${mb.toFixed(1)} MB de ~5 MB` : '';
+      const upd = document.getElementById('reg-updated');
+      upd.textContent = (registry.updatedAt
+        ? 'Atualizada em ' + new Date(registry.updatedAt).toLocaleString('pt-BR')
+        : '') + espaco;
+      upd.style.color = mb > 4 ? 'var(--yellow)' : 'var(--text3)';
+      const hint = document.getElementById('reg-hint');
+      if (docConflicts.length) {
+        hint.className = 'alert alert-warn';
+        hint.innerHTML = `⚠ ${docConflicts.length} CPF/CNPJ aparecem em mais de um contato do GHL `
+          + `(${escapeHtml(docConflicts.slice(0, 3).join(', '))}${docConflicts.length > 3 ? '…' : ''}). `
+          + 'Vale unificar esses contatos no GHL — por ora vale o último carregado.';
+      } else {
+        hint.className = 'alert alert-info';
+        hint.innerHTML = REG_HINT_DEFAULT;
+      }
+    }
+
+    const REG_HINT_DEFAULT = document.getElementById('reg-hint').innerHTML;
 
     function handleFile(file) {
       if (!file) return;
@@ -975,7 +1783,20 @@
 
     function detectColumns(sample) {
       const keys = Object.keys(sample);
-      const find = (...terms) => keys.find(k => terms.some(t => k.toLowerCase().includes(t.toLowerCase()))) || null;
+      // Casamento exato primeiro: o relatório tem "% COMISSÃO" antes de
+      // "COMISSÃO", e a busca por substring pegava a coluna de percentual
+      // quando o que se queria era a de valor.
+      const find = (...terms) => {
+        for (const t of terms) {
+          const k = keys.find(k => k.trim().toLowerCase() === t.toLowerCase());
+          if (k) return k;
+        }
+        for (const t of terms) {
+          const k = keys.find(k => k.toLowerCase().includes(t.toLowerCase()));
+          if (k) return k;
+        }
+        return null;
+      };
       return {
         cliente: find('CLIENTE'),
         seguradora: find('SEGURADORA'),
@@ -1114,6 +1935,12 @@
       rawData = data;
       columns = detectColumns(data[0]);
 
+      // Cada planilha começa exportando tudo — a exclusão é escolha do arquivo
+      // atual e não pode vazar para o próximo.
+      excludedRamos = new Set();
+      excludedColabs = new Set();
+      excludedOwners = new Set();
+
       productCounts = {};
       segCounts = {};
       colabCounts = {};
@@ -1121,7 +1948,7 @@
       data.forEach(row => {
         const p = String(row[columns.produto] || '').trim().toUpperCase();
         const s = String(row[columns.seguradora] || '').trim().toUpperCase();
-        const col = String(row[columns.colaborador] || '').trim().toUpperCase();
+        const col = colabKey(row[columns.colaborador]);
         const t = String(row[columns.tipo] || '').trim().toUpperCase();
         if (p) productCounts[p] = (productCounts[p] || 0) + 1;
         if (s) segCounts[s] = (segCounts[s] || 0) + 1;
@@ -1129,22 +1956,38 @@
         if (t) tipoCounts[t] = (tipoCounts[t] || 0) + 1;
       });
 
-      // Auto-map
+      // Auto-map. Precedência: mapeamento aprendido (correção manual salva de uma
+      // conversão anterior) → regra automática/dicionário → não mapeado. A escolha
+      // manual feita NESTA sessão entra depois, direto em updateMap/updateMapRaw,
+      // e sempre vence por sobrescrever a entrada do mapa.
       ramoMap = {};
       Object.keys(productCounts).forEach(p => {
-        ramoMap[p] = autoMapRamo(p) || '__UNMAPPED__';
+        ramoMap[p] = learned.ramos[p] || autoMapRamo(p) || '__UNMAPPED__';
       });
       segMap = {};
       Object.keys(segCounts).forEach(s => {
-        segMap[s] = autoMapSeg(s) || '__UNMAPPED__';
+        segMap[s] = learned.segs[s] || autoMapSeg(s) || '__UNMAPPED__';
       });
       colabMap = {};
       Object.keys(colabCounts).forEach(col => {
-        colabMap[col] = COLAB_MAP[col] || '__UNMAPPED__';
+        colabMap[col] = learned.colabs[col] || COLAB_MAP[col] || '__UNMAPPED__';
       });
       tipoMap = {};
       Object.keys(tipoCounts).forEach(t => {
-        tipoMap[t] = autoMapTipo(t) || '__UNMAPPED__';
+        tipoMap[t] = learned.tipos[t] || autoMapTipo(t) || '__UNMAPPED__';
+      });
+
+      // Clientes distintos, para a aba de vínculo de contatos. A mesma pessoa
+      // pode ter várias apólices — aqui ela aparece uma vez só.
+      clientIndex = {};
+      manualLink = {};
+      data.forEach(row => {
+        const cliente = String(row[columns.cliente] || '').trim();
+        const doc = normDoc(row[columns.cpfcnpj]);
+        const key = clientKeyOf(cliente, doc);
+        if (!key) return;
+        if (!clientIndex[key]) clientIndex[key] = { cliente, doc, count: 0 };
+        clientIndex[key].count++;
       });
 
       document.getElementById('section-upload').classList.add('hidden');
@@ -1155,38 +1998,74 @@
       renderMappingTable('segs');
       renderMappingTable('tipos');
       renderMappingTable('colabs');
+      renderContactsTable();
       renderPreview();
       updateSteps(2);
     }
 
+    // Percorre as linhas uma vez e classifica o vínculo de cada uma.
+    function matchStats() {
+      let vinculadas = 0, novas = 0, ambiguas = 0;
+      rawData.forEach(r => {
+        const m = matchContact(r[columns.cliente], r[columns.cpfcnpj]);
+        if (m.id) vinculadas++;
+        else if (m.how === 'ambiguo') ambiguas++;
+        else novas++;
+      });
+      return { vinculadas, novas, ambiguas };
+    }
+
     function updateStats() {
       const total = rawData.length;
-      const withPhone = rawData.filter(r => fmtPhone(r[columns.telefone])).length;
-      const unmappedRamos = Object.values(ramoMap).filter(v => v === '__UNMAPPED__').length;
+      const ms = matchStats();
+      // Item desmarcado não vai para o CSV, então não faz sentido ele exigir
+      // mapeamento nem travar a exportação.
+      const unmappedRamos = Object.entries(ramoMap)
+        .filter(([k, v]) => v === '__UNMAPPED__' && !excludedRamos.has(k)).length;
+      const unmappedColabs = Object.entries(colabMap)
+        .filter(([k, v]) => v === '__UNMAPPED__' && !excludedColabs.has(k)).length;
       const unmappedSegs = Object.values(segMap).filter(v => v === '__UNMAPPED__').length;
-      const unmappedColabs = Object.values(colabMap).filter(v => v === '__UNMAPPED__').length;
       const unmappedTipos = Object.values(tipoMap).filter(v => v === '__UNMAPPED__').length;
 
       document.getElementById('stat-total').textContent = total;
-      document.getElementById('stat-phone').textContent = withPhone;
+      document.getElementById('stat-linked').textContent = ms.vinculadas;
+      document.getElementById('stat-new').textContent = ms.novas + ms.ambiguas;
       document.getElementById('stat-ramos').textContent = unmappedRamos;
       document.getElementById('stat-segs').textContent = unmappedSegs;
+
+      // Clientes distintos ainda sem vínculo — é o que a aba Contatos lista.
+      const pendentes = Object.values(clientIndex)
+        .filter(c => !matchContact(c.cliente, c.doc).id).length;
 
       document.getElementById('tab-badge-ramos').textContent = unmappedRamos;
       document.getElementById('tab-badge-segs').textContent = unmappedSegs;
       document.getElementById('tab-badge-tipos').textContent = unmappedTipos;
       document.getElementById('tab-badge-colabs').textContent = unmappedColabs;
+      document.getElementById('tab-badge-contatos').textContent = pendentes;
       document.getElementById('tab-badge-ramos').className = 'count-badge' + (unmappedRamos > 0 ? ' warn' : '');
       document.getElementById('tab-badge-segs').className = 'count-badge' + (unmappedSegs > 0 ? ' warn' : '');
       document.getElementById('tab-badge-tipos').className = 'count-badge' + (unmappedTipos > 0 ? ' warn' : '');
       document.getElementById('tab-badge-colabs').className = 'count-badge' + (unmappedColabs > 0 ? ' warn' : '');
+      // Contato sem vínculo não é erro — o GHL cria um novo. Fica neutro.
+      document.getElementById('tab-badge-contatos').className = 'count-badge';
 
       const hasUnmapped = unmappedRamos > 0 || unmappedSegs > 0 || unmappedTipos > 0 || unmappedColabs > 0;
       document.getElementById('mapping-alert').classList.toggle('hidden', !hasUnmapped);
       document.getElementById('btn-export').disabled = hasUnmapped;
-      document.getElementById('unmapped-note').textContent = hasUnmapped
-        ? '⚠ Resolva os itens em vermelho nas abas acima para habilitar a exportação.'
-        : '';
+
+      // Descartar linhas em silêncio seria o pior desfecho: o total exportado
+      // fica sempre visível ao lado do botão.
+      const exportadas = rawData.filter(isRowExported).length;
+      const fora = total - exportadas;
+      const nota = document.getElementById('unmapped-note');
+      if (hasUnmapped) {
+        nota.textContent = '⚠ Resolva os itens em vermelho nas abas acima para habilitar a exportação.';
+      } else if (fora > 0) {
+        nota.textContent = `Serão exportadas ${exportadas} de ${total} linhas — ${fora} fora do CSV `
+          + 'por ramo ou colaborador desmarcado.';
+      } else {
+        nota.textContent = '';
+      }
     }
 
     function renderMappingTable(type) {
@@ -1203,6 +2082,22 @@
         .filter(([k]) => !filter || k.toLowerCase().includes(filter))
         .sort((a, b) => b[1] - a[1]);
 
+      // Linhas em que o colaborador aparece mas o dono é outro, por causa do
+      // grupo de produção. Sem isso a contagem da aba parece não bater com o
+      // que sai no CSV.
+      const desviadas = {};
+      if (isColab) {
+        rawData.forEach(row => {
+          const k = colabKey(row[columns.colaborador]);
+          if (!k) return;
+          const dono = resolveOwner(row);
+          const esperado = colabMap[k];
+          if (dono && esperado && esperado !== '__UNMAPPED__' && dono !== esperado) {
+            desviadas[k] = (desviadas[k] || 0) + 1;
+          }
+        });
+      }
+
       document.getElementById(`${type}-count-label`).textContent = `${entries.length} de ${Object.keys(counts).length} item(s)`;
 
       tbody.innerHTML = '';
@@ -1210,43 +2105,76 @@
         const current = map[original];
         const isUnmapped = current === '__UNMAPPED__';
         const tr = document.createElement('tr');
-        const safeKey = original.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        // Escapa duas vezes: como string JS (fica dentro de um onchange="...")
+        // e como HTML, senão um nome com aspas quebra o atributo.
+        const safeKey = escapeHtml(original.replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 
         let inputHtml;
         if (isColab) {
           const knownOptions = Object.keys(COLAB_MAP);
           const selectOpts = `<option value="__UNMAPPED__" ${isUnmapped ? 'selected' : ''}>— selecione —</option>`
-            + knownOptions.map(k => `<option value="${COLAB_MAP[k]}" ${current === COLAB_MAP[k] ? 'selected' : ''}>${k}</option>`).join('');
+            + knownOptions.map(k => `<option value="${escapeHtml(COLAB_MAP[k])}" ${current === COLAB_MAP[k] ? 'selected' : ''}>${escapeHtml(k)}</option>`).join('');
           inputHtml = `<div style="display:flex;gap:6px;align-items:center;">
         <select class="select-map ${isUnmapped ? 'unmapped' : ''}" style="flex:1" onchange="updateMap('colabs','${safeKey}',this)">
           ${selectOpts}
         </select>
         <input type="text" class="search-input ${isUnmapped ? 'unmapped' : ''}" style="width:160px;font-family:monospace;font-size:11px"
           placeholder="ID GHL manual..."
-          value="${isUnmapped ? '' : current}"
+          value="${isUnmapped ? '' : escapeHtml(current)}"
           oninput="updateMapRaw('colabs','${safeKey}',this)">
       </div>`;
         } else {
           const optionsHtml = `<option value="__UNMAPPED__" ${isUnmapped ? 'selected' : ''}>— selecione —</option>`
-            + options.map(o => `<option value="${o}" ${current === o ? 'selected' : ''}>${o}</option>`).join('');
+            + options.map(o => `<option value="${escapeHtml(o)}" ${current === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('');
           inputHtml = `<select class="select-map ${isUnmapped ? 'unmapped' : ''}" onchange="updateMap('${type}','${safeKey}',this)">${optionsHtml}</select>`;
         }
 
+        // Só ramos e colaboradores têm o controle de exportação.
+        const excl = excludedSet(type);
+        const exportCell = excl
+          ? `<td style="text-align:center"><input type="checkbox" ${excl.has(original) ? '' : 'checked'}
+               title="Desmarque para deixar estas linhas fora do CSV"
+               onchange="toggleExport('${type}','${safeKey}',this)"></td>`
+          : '';
+        const isExcluded = excl ? excl.has(original) : false;
+
         tr.innerHTML = `
-      <td><span class="tag-original">${original}</span></td>
+      ${exportCell}
+      <td><span class="tag-original">${escapeHtml(original)}</span>${desviadas[original]
+            ? `<div style="font-size:11px;color:var(--text3);margin-top:3px">${desviadas[original]} linha(s) vão para outro dono pelo grupo de produção</div>`
+            : ''}</td>
       <td style="color:var(--text3)">${count}</td>
       <td>${inputHtml}</td>
-      <td>${isUnmapped
-            ? '<span class="badge-warn">⚠ Não mapeado</span>'
-            : '<span class="badge-ok">✓ Mapeado</span>'}</td>
+      <td>${isExcluded
+            ? '<span class="badge-neutral">— fora do CSV</span>'
+            : (isUnmapped
+              ? '<span class="badge-warn">⚠ Não mapeado</span>'
+              : '<span class="badge-ok">✓ Mapeado</span>')}</td>
     `;
+        if (isExcluded) tr.style.opacity = '0.45';
         tbody.appendChild(tr);
       });
+    }
+
+    function toggleExport(type, original, checkboxEl) {
+      const excl = excludedSet(type);
+      if (!excl) return;
+      if (checkboxEl.checked) excl.delete(original);
+      else excl.add(original);
+      rebuildExcludedOwners();
+      // Redesenha a aba inteira: o item muda de badge e de opacidade, e o
+      // contador de itens não mapeados que travam a exportação também muda.
+      renderMappingTable(type);
+      updateStats();
+      renderPreview();
     }
 
     function updateMap(type, original, selectEl) {
       const map = getMap(type);
       map[original] = selectEl.value;
+      learnMap(type, original, selectEl.value);
+      // O dono desmarcado é derivado do mapeamento; mudou o mapa, refaz.
+      if (type === 'colabs') rebuildExcludedOwners();
       selectEl.className = 'select-map' + (selectEl.value === '__UNMAPPED__' ? ' unmapped' : '');
       // Sync text input if colab
       if (type === 'colabs') {
@@ -1266,6 +2194,8 @@
       const map = getMap(type);
       const val = inputEl.value.trim() || '__UNMAPPED__';
       map[original] = val;
+      learnMap(type, original, val);
+      if (type === 'colabs') rebuildExcludedOwners();
       inputEl.className = 'search-input' + (val === '__UNMAPPED__' ? ' unmapped' : '');
       const tr = inputEl.closest('tr');
       tr.querySelector('td:last-child').innerHTML = val === '__UNMAPPED__'
@@ -1280,13 +2210,83 @@
     }
 
     function switchTab(type) {
-      const tabs = ['ramos', 'segs', 'tipos', 'colabs'];
+      const tabs = ['ramos', 'segs', 'tipos', 'colabs', 'contatos'];
       document.querySelectorAll('.tab').forEach((t, i) => {
         t.classList.toggle('active', tabs[i] === type);
       });
       tabs.forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('active', t === type);
       });
+    }
+
+    const MATCH_BADGE = {
+      doc: ['badge-ok', '✓ CPF/CNPJ'],
+      nome: ['badge-ok', '✓ Nome'],
+      manual: ['badge-ok', '✓ Manual'],
+      ambiguo: ['badge-warn', '⚠ Ambíguo'],
+      novo: ['badge-neutral', '+ Contato novo'],
+    };
+
+    function fmtDocBr(doc) {
+      if (!doc) return '—';
+      if (doc.length === 11) return doc.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      if (doc.length === 14) return doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+      return doc;
+    }
+
+    // Documento pronto para o CSV: normalizado e formatado. Se não der um CPF ou
+    // CNPJ válido, vai vazio — melhor campo em branco do que lixo no cadastro.
+    function fmtDocBrOuVazio(val) {
+      const d = normDoc(val);
+      return d ? fmtDocBr(d) : '';
+    }
+
+    function renderContactsTable() {
+      const tbody = document.querySelector('#table-contatos tbody');
+      if (!tbody) return;
+      const filter = (document.getElementById('search-contatos').value || '').toLowerCase();
+      const onlyPending = document.getElementById('only-pending').checked;
+
+      document.getElementById('contatos-empty').classList
+        .toggle('hidden', Object.keys(registry.contacts).length > 0);
+
+      const entries = Object.entries(clientIndex)
+        .map(([key, c]) => ({ key, ...c, match: matchContact(c.cliente, c.doc) }))
+        .filter(e => !filter || e.cliente.toLowerCase().includes(filter) || (e.doc || '').includes(filter))
+        .filter(e => !onlyPending || !e.match.id)
+        // Pendentes primeiro, e dentro de cada grupo quem tem mais apólices.
+        .sort((a, b) => (!!a.match.id - !!b.match.id) || (b.count - a.count));
+
+      document.getElementById('contatos-count-label').textContent =
+        `${entries.length} de ${Object.keys(clientIndex).length} cliente(s)`;
+
+      tbody.innerHTML = '';
+      entries.forEach(e => {
+        const [badgeCls, badgeTxt] = MATCH_BADGE[e.match.how] || MATCH_BADGE.novo;
+        const detalhe = e.match.how === 'ambiguo' || e.match.how === 'nome'
+          ? `<div style="font-size:11px;color:var(--text3);margin-top:3px">${escapeHtml(e.match.label)}</div>`
+          : '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+      <td><span class="tag-original">${escapeHtml(e.cliente)}</span></td>
+      <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px">${escapeHtml(fmtDocBr(e.doc))}</td>
+      <td style="color:var(--text3)">${e.count}</td>
+      <td><span class="${badgeCls}">${badgeTxt}</span>${detalhe}</td>
+      <td><input type="text" class="search-input" style="width:190px;font-family:'DM Mono',monospace;font-size:11px"
+            placeholder="colar Contact Id..." value="${escapeHtml(e.match.id)}"
+            data-key="${escapeHtml(e.key)}" oninput="updateContactLink(this)"></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateContactLink(inputEl) {
+      const key = inputEl.dataset.key;
+      const entry = clientIndex[key];
+      if (!entry) return;
+      setManualLink(key, inputEl.value.trim(), entry.cliente, entry.doc);
+      updateStats();
+      renderPreview();
+      renderRegistryCard();
     }
 
     function buildRow(row) {
@@ -1324,10 +2324,27 @@
       const iniRenov = addOneYear(iniOrig);
       const fimRenov = addOneYear(fimOrig);
 
+      const match = matchContact(cliente, cpfcnpj);
+
       return {
+        "Contact Id": match.id,
+        "_vinculo": match.id ? match.label : (match.how === 'ambiguo' ? 'Ambíguo' : 'Novo'),
+        // Chaves internas para o detector de duplicatas (T3.3) — não vão ao CSV.
+        // clientKeyOf() espera o documento já normalizado (mesma convenção usada
+        // em processData()/matchContact()) — sem normDoc aqui, CPF formatado
+        // diferente entre linhas do mesmo cliente não bateria.
+        "_clientKey": clientKeyOf(cliente, normDoc(cpfcnpj)),
+        "_cliente": cliente,
         "First Name": firstName,
         "Last Name": lastName,
         "Business Name": businessName,
+        // Vai normalizado e reformatado: o Quiver emite CNPJ com um zero a mais
+        // ("010.862.833/0001-15") e esse defeito já entrou no GHL pelas Notes.
+        "cpfcnpj": fmtDocBrOuVazio(cpfcnpj),
+        // Telefone e e-mail do Quiver costumam estar errados (e-mail da própria
+        // corretora, fixo do escritório repetido entre clientes). Ficam fora do
+        // CSV para não sobrescrever o dado bom que já está no GHL — basta
+        // devolvê-los a EXPORT_COLUMNS para voltar a exportar.
         "Phone": fmtPhone(row[c.telefone]),
         "Email": String(row[c.email] || '').trim(),
         "Opportunity name": `Renovação - ${ramo} - Apólice ${apolice}`,
@@ -1351,11 +2368,10 @@
         "tiponegoico": tipoNegocio,
         "tipodocumento": "Apólice",
         "grpproducao": String(row[c.grupoProd] || '').trim().replace(/\//g, '|'),
-        "Opportunity Owner": (() => {
-          const nome = String(row[c.colaborador] || '').trim().toUpperCase();
-          const mapped = colabMap[nome];
-          return (mapped && mapped !== '__UNMAPPED__') ? mapped : '';
-        })(),
+        "Opportunity Owner": resolveOwner(row),
+        // Só para a prévia: nome de quem recebe, e de onde veio a decisão.
+        "_owner": nomeDoOwner(resolveOwner(row)),
+        "_ownerOrigem": GRUPO_OWNER[grupoKey(row[c.grupoProd])] ? 'grupo' : 'colaborador',
         "formapag": String(row[c.formapag] || '').trim(),
         "parcelas": String(row[c.parcelas] || '').trim(),
         "sinistros": fmtNum(row[c.sinistro]),
@@ -1363,12 +2379,56 @@
       };
     }
 
+    // ── Duplicatas dentro do próprio arquivo (T3.3) ──────────────────────────
+    // Cliente com várias apólices distintas é o caso normal do negócio (auto +
+    // residencial não é duplicata) — só sinaliza quando também bate o ramo e a
+    // vigência de renovação. Apólice vazia nunca conta: várias linhas sem
+    // apólice não são "a mesma" apólice. Não desabilita a exportação — pode ser
+    // endosso, coparticipação ou item adicional legítimo; a decisão é de quem revisa.
+    function findDuplicates(rows) {
+      const byApolice = {};
+      const byCombo = {};
+      rows.forEach((r, i) => {
+        if (r.numero_da_apolice) {
+          (byApolice[r.numero_da_apolice] = byApolice[r.numero_da_apolice] || []).push(i);
+        }
+        if (r._clientKey && r.ramo && r.inivigencia && r.fimvigencia) {
+          const combo = `${r._clientKey}${r.ramo}${r.inivigencia}${r.fimvigencia}`;
+          (byCombo[combo] = byCombo[combo] || []).push(i);
+        }
+      });
+
+      const dupIdx = new Set();
+      const groups = [];
+      Object.entries(byApolice).forEach(([apolice, idxs]) => {
+        if (idxs.length < 2) return;
+        idxs.forEach(i => dupIdx.add(i));
+        groups.push({ label: `Apólice ${apolice}`, count: idxs.length });
+      });
+      Object.entries(byCombo).forEach(([, idxs]) => {
+        if (idxs.length < 2) return;
+        idxs.forEach(i => dupIdx.add(i));
+        const r0 = rows[idxs[0]];
+        const nome = r0._cliente || [r0['First Name'], r0['Last Name']].filter(Boolean).join(' ') || r0['Business Name'];
+        groups.push({
+          label: `${nome} — ${r0.ramo} (renovação ${fmtDateBr(r0.inivigencia)}–${fmtDateBr(r0.fimvigencia)})`,
+          count: idxs.length,
+        });
+      });
+
+      return { dupIdx, groups };
+    }
+
     function renderPreview() {
       const PREVIEW_COLS = [
+        { key: "_vinculo", label: "Vínculo" },
+        { key: "_dup", label: "Duplicada?" },
+        { key: "_owner", label: "Proprietário" },
+        { key: "_ownerOrigem", label: "Dono via" },
+        { key: "Contact Id", label: "Contact Id" },
         { key: "First Name", label: "First Name" },
         { key: "Last Name", label: "Last Name" },
         { key: "Business Name", label: "Business Name" },
-        { key: "Phone", label: "Phone" },
         { key: "Opportunity name", label: "Opportunity name" },
         { key: "ramo", label: "ramo" },
         { key: "seguradora", label: "seguradora" },
@@ -1381,38 +2441,133 @@
         { key: "fimvigencia_depois", label: "Fim vig. (ficou)", cls: "vig-depois" },
         { key: "pb", label: "pb" },
       ];
-      const sample = rawData.slice(0, 10).map(buildRow);
+      // Uma passada só por todas as linhas — buildRow() não roda de novo por
+      // filtro clicado, e o mesmo array alimenta contagens, filtros e duplicatas.
+      // A prévia mostra exatamente o que vai para o CSV, então ramos e
+      // colaboradores desmarcados ficam de fora daqui também.
+      const allRows = rawData.filter(isRowExported).map(buildRow);
+      const { dupIdx, groups } = findDuplicates(allRows);
+      allRows.forEach((r, i) => { r._dup = dupIdx.has(i) ? '⚠ Sim' : ''; });
+
+      const isValorZero = r => !r['Opportunity Value'] || !parseFloat(r['Opportunity Value']);
+      const CRITERIA = [
+        { id: 'filter-sem-telefone', countEl: 'count-sem-telefone', label: 'sem telefone', test: r => !r.Phone },
+        { id: 'filter-sem-owner', countEl: 'count-sem-owner', label: 'sem Opportunity Owner', test: r => !r['Opportunity Owner'] },
+        { id: 'filter-valor-zero', countEl: 'count-valor-zero', label: 'valor zerado/vazio', test: isValorZero },
+        { id: 'filter-sem-contato', countEl: 'count-sem-contato', label: 'sem contato vinculado', test: r => !r['Contact Id'] },
+        { id: 'filter-duplicadas', countEl: 'count-duplicadas', label: 'duplicadas', test: (r, i) => dupIdx.has(i) },
+      ];
+
+      // A contagem de cada filtro é sempre sobre o total — mesmo desmarcado —
+      // para a prévia funcionar como diagnóstico, não só amostra das 1ªs linhas.
+      const active = [];
+      CRITERIA.forEach(cr => {
+        const count = allRows.reduce((n, r, i) => n + (cr.test(r, i) ? 1 : 0), 0);
+        document.getElementById(cr.countEl).textContent = count;
+        if (document.getElementById(cr.id).checked) active.push(cr);
+      });
+
+      // Filtros são combináveis (E lógico): cada um marcado restringe mais.
+      const filteredIdx = [];
+      allRows.forEach((r, i) => { if (active.every(cr => cr.test(r, i))) filteredIdx.push(i); });
+
+      const limitRaw = document.getElementById('preview-limit').value || '10';
+      const limit = limitRaw === 'all' ? filteredIdx.length : Number(limitRaw);
+      const shownIdx = filteredIdx.slice(0, limit);
 
       const thead = document.querySelector('#preview-table thead');
       const tbody = document.querySelector('#preview-table tbody');
       thead.innerHTML = '<tr>' + PREVIEW_COLS.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
-      tbody.innerHTML = sample.map(r =>
-        '<tr>' + PREVIEW_COLS.map(c => {
-          const val = r[c.key] || '';
+      // Concatena string e faz um único innerHTML — mesmo na opção "Todas" com
+      // centenas/milhares de linhas, isso é mais rápido que criar nó por nó.
+      tbody.innerHTML = shownIdx.map(i => {
+        const r = allRows[i];
+        return '<tr>' + PREVIEW_COLS.map(c => {
+          const val = escapeHtml(r[c.key] || '');
           const tdCls = c.cls ? ` class="${c.cls}"` : '';
           return `<td${tdCls} title="${val}">${val}</td>`;
-        }).join('') + '</tr>'
-      ).join('');
-      document.getElementById('preview-count').textContent = `${rawData.length} linhas`;
+        }).join('') + '</tr>';
+      }).join('');
+
+      // A pílula conta o que vai para o CSV, não o arquivo inteiro — senão
+      // contradiz o rótulo de escopo ao lado quando há ramo ou dono desmarcado.
+      document.getElementById('preview-count').textContent = allRows.length === rawData.length
+        ? `${allRows.length} linhas`
+        : `${allRows.length} de ${rawData.length} linhas`;
+
+      // O "total" aqui é o que será exportado (allRows), não o arquivo inteiro:
+      // linha de ramo ou dono desmarcado não entra nem na prévia nem no CSV.
+      const filtro = active.map(cr => cr.label).join(' + ');
+      document.getElementById('preview-scope-label').textContent = active.length
+        ? `${shownIdx.length} de ${filteredIdx.length} filtrada(s) por ${filtro} · ${allRows.length} a exportar`
+        : `${shownIdx.length} de ${allRows.length} registro(s) a exportar`;
+
+      const dupAlert = document.getElementById('preview-dup-alert');
+      if (groups.length) {
+        dupAlert.classList.remove('hidden');
+        dupAlert.innerHTML = `⚠ ${dupIdx.size} linha(s) em ${groups.length} possível(is) duplicata(s) — revise antes `
+          + `de exportar (pode ser endosso, coparticipação ou item adicional legítimo):<br>`
+          + groups.slice(0, 20).map(g => `• ${escapeHtml(g.label)} (${g.count} linhas)`).join('<br>')
+          + (groups.length > 20 ? `<br>… e mais ${groups.length - 20} caso(s).` : '');
+      } else {
+        dupAlert.classList.add('hidden');
+        dupAlert.innerHTML = '';
+      }
     }
 
-    function exportCSV() {
-      const fieldnames = [
-        "First Name", "Last Name", "Business Name", "Phone", "Email",
-        "Opportunity name", "Pipeline", "Stage", "Opportunity Value", "Opportunity Owner",
-        "Notes", "Tags",
-        "numero_da_apolice", "ramo", "per_comissao", "pb", "pl", "comissao",
-        "inivigencia", "fimvigencia", "tiponegoico", "tipodocumento", "grpproducao",
-        "formapag", "parcelas", "sinistros", "seguradora"
-      ];
+    // Cabeçalho do CSV: `header` é o nome que o IMPORTADOR do GHL espera, que
+    // nem sempre é o rótulo do export. Os campos padrão (contato, oportunidade,
+    // etapa, valor, proprietário) vão em inglês; os campos personalizados vão
+    // com o nome em português, exatamente como aparecem no export de
+    // oportunidades. A mistura é do GHL, não nossa — não "uniformize".
+    //
+    // Ficam de fora de propósito: "Phone" e "Email" (dado do Quiver não confiável,
+    // ver comentário em buildRow) e "Notes"/Observações, que só carregava o
+    // CPF/CNPJ e virou redundante agora que existe coluna própria para ele.
+    // Para reativar qualquer um, basta devolver a linha a esta lista.
+    const EXPORT_COLUMNS = [
+      { key: "Contact Id", header: "Contact ID" },
+      { key: "First Name", header: "First Name" },
+      { key: "Last Name", header: "Last Name" },
+      { key: "Business Name", header: "Business Name" },
+      { key: "cpfcnpj", header: "CPF/CNPJ" },
+      { key: "Opportunity name", header: "Opportunity Name" },
+      { key: "Pipeline", header: "pipeline" },
+      { key: "Stage", header: "Stage" },
+      { key: "Opportunity Value", header: "Opportunity Value" },
+      { key: "Opportunity Owner", header: "Opportunity Owner" },
+      { key: "Tags", header: "tags" },
+      { key: "numero_da_apolice", header: "Numero da Apolice" },
+      { key: "seguradora", header: "Seguradora" },
+      { key: "ramo", header: "Ramo" },
+      { key: "per_comissao", header: "% Comissao" },
+      { key: "pb", header: "Premio bruto" },
+      { key: "pl", header: "Premio Liquido" },
+      { key: "comissao", header: "Comissao" },
+      { key: "inivigencia", header: "Inicio de vigencia" },
+      { key: "fimvigencia", header: "Fim de vigencia" },
+      { key: "tiponegoico", header: "tipo de Negoico" },
+      { key: "tipodocumento", header: "tipoDocumento" },
+      { key: "grpproducao", header: "grupo de producao" },
+      { key: "formapag", header: "forma de pagamento" },
+      { key: "parcelas", header: "Parcelas" },
+      { key: "sinistros", header: "Sinistros" },
+    ];
 
-      const rows = rawData.map(buildRow);
+    function exportCSV() {
+      const rows = rawData.filter(isRowExported).map(buildRow);
+      if (!rows.length) {
+        alert('Nenhuma linha a exportar — todos os ramos ou colaboradores estão desmarcados.');
+        return;
+      }
       const escape = v => {
         const s = String(v);
         return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       };
-      const header = fieldnames.join(',');
-      const body = rows.map(r => fieldnames.map(f => escape(r[f] !== undefined && r[f] !== null ? r[f] : '')).join(',')).join('\r\n');
+      const header = EXPORT_COLUMNS.map(c => escape(c.header)).join(',');
+      const body = rows.map(r => EXPORT_COLUMNS
+        .map(c => escape(r[c.key] !== undefined && r[c.key] !== null ? r[c.key] : ''))
+        .join(',')).join('\r\n');
       const csv = '\uFEFF' + header + '\r\n' + body; // BOM for Excel
 
       const bytes = new TextEncoder().encode(csv);
@@ -1430,9 +2585,15 @@
 
     function resetApp() {
       rawData = [];
+      clientIndex = {};
+      manualLink = {};
       document.getElementById('section-main').classList.add('hidden');
       document.getElementById('section-upload').classList.remove('hidden');
       document.getElementById('file-input').value = '';
+      // Prévia começa limpa na próxima planilha — sem filtro herdado da anterior.
+      ['filter-sem-telefone', 'filter-sem-owner', 'filter-valor-zero', 'filter-sem-contato', 'filter-duplicadas']
+        .forEach(id => { document.getElementById(id).checked = false; });
+      document.getElementById('preview-limit').value = '10';
       updateSteps(1);
     }
 
@@ -1444,6 +2605,13 @@
       if (active >= 3) document.getElementById('step3').className = 'step done';
       if (active >= 4) document.getElementById('step4').className = 'step done';
     }
+
+    // Init
+    loadRegistry();
+    loadLearned();
+    renderRegistryCard();
+    renderLearnedTable();
+    renderLearnedCard();
   </script>
 </body>
 
