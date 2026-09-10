@@ -4011,7 +4011,12 @@ const TV_EX_CHART_IDS = ['tv-ex-ano-chart', 'tv-ex-nivel-chart'];
 // Colaboradores fora de todos os gráficos da Exibição TV (pedido específico desta
 // tela — não mexe em nenhum outro lugar do dashboard). Compara pelo primeiro nome,
 // sem acento/maiúsculas, pra pegar variações de grafia do cadastro.
-const TV_COLAB_EXCLUIDOS = ['CELSO', 'DENISE', 'ALESSANDRA'];
+//
+// 'TRANSFERENCIA' não é pessoa: é a pseudo-carteira de transferência de corretagem,
+// que entra como produção sem ser venda nova e distorceria a meta. Fica só o
+// prefixo (e não 'TRANSFERENCIA CORRETAGEM') para pegar também 'Transferência DE
+// Corretagem' e demais variações de cadastro.
+const TV_COLAB_EXCLUIDOS = ['CELSO', 'DENISE', 'ALESSANDRA', 'TRANSFERENCIA'];
 const tvColabExcluido = colab => TV_COLAB_EXCLUIDOS.some(nome => normRamo(colab).startsWith(nome));
 const tvBaseRows = () => ALL.filter(r => !tvColabExcluido(r.colab));
 
