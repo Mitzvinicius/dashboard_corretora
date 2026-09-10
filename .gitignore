@@ -21,6 +21,7 @@ venv/
 # ── Config local do editor / Claude ──
 .claude/settings.local.json
 .claude/skills/
+.idea/
 
 # ── Arquivos de sistema operacional ──
 Thumbs.db
