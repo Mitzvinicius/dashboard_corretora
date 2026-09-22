@@ -4501,17 +4501,29 @@ function renderTvExMetaNovos() {
 const TV_CARTEIRA_MIN_DIAS = 350;
 const tvDuracaoOk = r => !r.fim || (r.fim - r.vig) / 86400000 >= TV_CARTEIRA_MIN_DIAS;
 
+// A duração sozinha não basta: ela tem o furo do `!r.fim` — apólice sem término
+// de vigência preenchido passa por qualquer ramo — e a viagem anual (multi-viagem)
+// dura 365 dias. Como viagem e carta verde não são carteira recorrente, ficam de
+// fora pelo nome do ramo também. Lista própria e curta de propósito: NÃO é o
+// classifyRamo() === 'excluded' da aba Metas, que derrubaria junto acidentes
+// pessoais, previdência e outros que aqui continuam contando como carteira.
+const TV_CARTEIRA_RAMOS_FORA = ['VIAGEM', 'CARTA VERDE'];
+const tvRamoCarteiraOk = r => !TV_CARTEIRA_RAMOS_FORA.some(k => normRamo(r.ramo).includes(k));
+
 // Todos os clientes (PF + PJ), de qualquer colaborador (clientes por nível não
 // exclui Celso/Denise — só o ranking e os cards da esquerda excluem) — mesma
 // lógica de agregação da aba Cross-sell (buildCrossMap), já descontando os
-// seguros temporários/acessórios (tvDuracaoOk).
+// seguros temporários/acessórios (tvDuracaoOk) e viagem/carta verde
+// (tvRamoCarteiraOk) — mesmo critério de carteira do gráfico de carteira
+// acumulada, senão um cliente subiria de nível por causa de duas apólices de
+// viagem enquanto o outro gráfico do mesmo painel as ignora.
 function tvExClientes() {
   const map = new Map();
   ALL.forEach(r => {
     if (!r.docDigits) return;
     let c = map.get(r.docDigits);
     if (!c) { c = { doc: r.docDigits, apolicesAtivas: 0, primeiraVig: null }; map.set(r.docDigits, c); }
-    if (r.sit === 'Ativa' && r.tipoDoc === 'APÓLICE' && tvDuracaoOk(r)) c.apolicesAtivas++;
+    if (r.sit === 'Ativa' && r.tipoDoc === 'APÓLICE' && tvDuracaoOk(r) && tvRamoCarteiraOk(r)) c.apolicesAtivas++;
     if (r.vig && (!c.primeiraVig || r.vig < c.primeiraVig)) c.primeiraVig = r.vig;
   });
   return [...map.values()];
@@ -4527,24 +4539,27 @@ function tvExClientes() {
 // naquele ano. Isso também evita contar a mesma apólice em vários anos (cada
 // renovação é uma linha com sua própria janela vig→fim, sem sobreposição).
 //
-// O ano corrente é diferente: como ainda está em andamento, não faz sentido
-// aplicar o mesmo "retrato" (contaria apólices de anos passados que ainda não
-// venceram, mas que também ainda não sabemos se serão renovadas). Em vez
-// disso, conta só as apólices ATIVAS hoje cuja vigência começou dentro do
-// próprio ano corrente (a partir de 01/01).
+// O ano corrente é o retrato de HOJE: a carteira ativa inteira, não só o que
+// foi emitido/renovado dentro do ano. Conta as apólices com SITUAÇÃO 'Ativa',
+// venham de que ano vierem — é o mesmo "quantas apólices estavam em vigor
+// naquela data" dos anos fechados, com a data sendo hoje. Usar 'Ativa' (e não
+// a janela vig→fim) evita contar duas vezes o contrato renovado com
+// antecedência: a linha antiga vira 'Renovada' e só a sucessora fica 'Ativa'
+// (METRICAS.md §1.1).
 function buildTvAnoCarteira() {
   const rows = ALL
-    .filter(r => r.tipoDoc === 'APÓLICE' && r.vig && tvDuracaoOk(r))
+    .filter(r => r.tipoDoc === 'APÓLICE' && r.vig && tvDuracaoOk(r) && tvRamoCarteiraOk(r))
     .map(r => ({ vig: r.vig, fim: (r.sit === 'Cancelada' && r.cancel) ? r.cancel : r.fim, sit: r.sit }));
   if (!rows.length) return { labels: [], data: [] };
-  const minY = Math.min(...rows.map(r => r.vig.getFullYear()));
+  // Sem spread: a base multi-ano passa de 100 mil linhas e estoura a pilha.
+  let minY = Infinity;
+  for (const r of rows) { const y = r.vig.getFullYear(); if (y < minY) minY = y; }
   const maxY = today().getFullYear();
-  const jan1CurYear = new Date(maxY, 0, 1);
   const labels = [], data = [];
   for (let y = minY; y <= maxY; y++) {
     let count;
     if (y === maxY) {
-      count = rows.filter(r => r.sit === 'Ativa' && r.vig >= jan1CurYear).length;
+      count = rows.filter(r => r.sit === 'Ativa').length;
     } else {
       const checkpoint = new Date(y, 11, 31);
       count = rows.filter(r => r.vig <= checkpoint && (!r.fim || r.fim >= checkpoint)).length;

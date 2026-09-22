@@ -185,6 +185,59 @@ meta mensal, cards da campanha 360 e pódio Top 3. Nada fora da Exibição TV.
 
 ---
 
+## 6.1 Exibição TV — carteira acumulada por ano
+
+Gráfico *"Carteira acumulada — apólices ativas por ano"* (`buildTvAnoCarteira`).
+
+**Anos fechados** são um retrato por data, não pelo status de hoje: para cada ano
+Y, conta as apólices que já tinham vigência iniciada e ainda não tinham terminado
+ou sido canceladas em 31/12 de Y. Usa `vig`/`fim`/`cancel`, nunca `sit` — o status
+atual só descreve o presente, e uma apólice em vigor em 2022 hoje aparece como
+"Renovada".
+
+**O ano corrente é o retrato de hoje:** a carteira ativa inteira (`sit === 'Ativa'`),
+venha a apólice do ano que vier. Antes contava só o que tinha vigência iniciada
+dentro do próprio ano, o que fazia a última barra parecer uma queda da carteira
+quando era só o ano ainda não ter fechado. Contar por `sit === 'Ativa'` (e não pela
+janela `vig→fim` em hoje) evita contar duas vezes o contrato renovado com
+antecedência — ver §1.1.
+
+### O que não entra na carteira
+
+Dois filtros, por motivos diferentes:
+
+```js
+const TV_CARTEIRA_MIN_DIAS = 350;                          // duração
+const TV_CARTEIRA_RAMOS_FORA = ['VIAGEM', 'CARTA VERDE'];  // ramo
+```
+
+A **duração** tira o que é temporário/acessório (vigência menor que ~12 meses).
+Sozinha ela não bastava: tem o furo do `!r.fim` — apólice sem término de vigência
+preenchido passa por qualquer ramo — e viagem anual (multi-viagem) dura 365 dias.
+
+Daí o filtro por **nome do ramo**, decidido em 22/09/2026: viagem e carta verde não
+são carteira recorrente e não devem contar como apólice ativa no telão.
+
+A lista é curta de propósito e **não** é o `classifyRamo() === 'excluded'` da aba
+Metas. Aquela lista também derruba acidentes pessoais, previdência/VGBL, eventos
+aleatórios, transporte nacional e educacional — que ficam fora da *meta*, mas
+continuam sendo carteira de verdade e seguem contando aqui.
+
+O filtro vale para **todos os anos**, inclusive os fechados, senão a série
+compararia critérios diferentes entre uma barra e outra.
+
+### Onde mais o critério vale
+
+Os dois filtros valem também em **"Clientes por nível"** (`tvExClientes`), que conta
+apólices ativas por cliente para atribuir o nível. É o mesmo painel: sem isso, um
+cliente subiria de nível por duas apólices de viagem enquanto o gráfico ao lado as
+ignora.
+
+Fora da Exibição TV nada muda — a aba **Cross-sell** tem a sua própria contagem de
+apólices ativas (`buildCrossMap`), sem filtro de duração nem de ramo, e segue assim.
+
+---
+
 ## 7. Pendências e decisões em aberto
 
 - **Análise de coortes** (`renderCohorts`) segue na regra antiga: rastreia queda mês
@@ -198,9 +251,6 @@ meta mensal, cards da campanha 360 e pódio Top 3. Nada fora da Exibição TV.
 - **Cross-sell e contagem de ativas da Exibição TV** filtram `sit === 'Ativa'`.
   Excluir `Renovada` provavelmente está certo (a sucessora é que é a vigente), mas
   não foi auditado.
-- **`.claude/launch.json`** aponta para `python -m http.server`, e o `python` do PATH
-  é o stub da Microsoft Store — o preview não sobe. Alternativa:
-  `npx http-server . -p 5500 -c-1`.
 - **Branch `att_comparativo`** ficou apontando para `67f8a84`, atrás da `main`.
 
 ---
