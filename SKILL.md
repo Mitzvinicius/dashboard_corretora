@@ -11,7 +11,7 @@ O projeto tem duas camadas independentes, **ambas funcionando**:
 
 | Camada | Arquivo | Papel |
 |--------|---------|-------|
-| Sync server-side | `scripts/sync_producao.py` | Puxa os Excel de e-mails e os sobe para o SharePoint |
+| Sync server-side | `scripts/sync_producao.py` | Puxa os Excel **de sinistros** de e-mails e os sobe para o SharePoint |
 | Dashboard browser-side | `index.html` + `main.js` | Autentica via MSAL no Azure AD, baixa os Excel do SharePoint (Graph API), parseia e renderiza |
 
 O fluxo é: **Python sync (e-mail → SharePoint)** → **browser (MSAL → Graph API → render)**.
@@ -49,9 +49,13 @@ chooseProd() / chooseSin()
   └─ _getSpToken()                 # token via cache (silencioso) ou loginPopup
        └─ _buildMsal()             # cria PublicClientApplication (cache em localStorage)
   └─ _spFetchAndLoad(token, mode)
-       ├─ _spGetDriveId(token)     # GET /sites/{host} → /sites/{id}/drives → acha a lib "Santolin"
-       ├─ GET /drives/{id}/root:/Dashboard/{arquivo}.xlsx:/content  (cada planilha)
+       ├─ _spGetDriveId(token)          # GET /sites/{host} → /sites/{id}/drives → acha a lib "Santolin"
+       ├─ _spListProducaoFiles(token)   # GET /drives/{id}/root:/Dashboard:/children
+       │                                #   → filtra /^producao.*.xlsx$/i (um arquivo por ano)
+       ├─ downloads em paralelo:        # produção (por item id) + os dois de sinistros
+       │    └─ cache IndexedDB 'dash-cache' por cTag — só rebaixa o arquivo que mudou
        └─ applySharePointData(payloads, warnings)   # parseia e abre o dashboard
+            └─ loadProducaoFromSources()            # concatena os anos em ALL, deduplicando
 ```
 
 **Estratégia "Brave-friendly"** (comentada no código): sem `ssoSilent` (evita iframe + cookies de terceiros); `acquireTokenSilent` só quando há conta em cache; `loginPopup` direto disparado pelo clique quando não há conta.
@@ -67,7 +71,7 @@ chooseProd() / chooseSin()
 | SharePoint hostname | `santolinseguros.sharepoint.com` |
 | Biblioteca | `Santolin` |
 | Pasta | `Dashboard` |
-| Arquivos esperados | `producao.xlsx`, `sinistrosAvisados.xlsx`, `sinistrosPagamentos.xlsx` |
+| Arquivos esperados | `producao_<ano>.xlsx` (um por ano, ex.: `producao_2021.xlsx` … `producao_2026.xlsx`), `sinistrosAvisados.xlsx`, `sinistrosPagamentos.xlsx` |
 | Tenant ID | `59190e65-5cad-4885-9f2d-77a59385667b` |
 | **App ID — browser (SPA / MSAL)** | `18d14ac5-16fc-46f4-8ffa-95f880138247` |
 | App ID — sync (Python, client credentials) | `b5812845-04d8-4b4a-b754-bdd435ab09b9` |
@@ -77,6 +81,45 @@ chooseProd() / chooseSin()
 **Registro no Azure AD (app do browser):** plataforma **SPA**, redirect `http://localhost:5500/auth.html`, permissão delegada **Microsoft Graph → Files.Read.All** com consentimento de administrador.
 
 > Como é fluxo **delegado** + popup, o dashboard precisa ser servido via `http://localhost` (não funciona em `file://`). Use `launch_dashboard.py` / `Abrir Dashboard.bat`.
+
+---
+
+## 4.1 Como atualizar os dados de produção
+
+A base de produção vive **quebrada em um arquivo por ano** na pasta `Dashboard`:
+
+```
+/Santolin/Dashboard/producao_2021.xlsx
+                    producao_2022.xlsx
+                    …
+                    producao_2026.xlsx     ← só este é substituído no dia a dia
+```
+
+Para atualizar:
+
+1. Exportar do ERP o relatório de produção **do ano** (`RptAnaliseProducao`).
+2. Salvar como `producao_<ano>.xlsx`.
+3. Soltar na pasta `Dashboard` do SharePoint, sobrescrevendo o arquivo daquele ano.
+4. Recarregar o dashboard. No cabeçalho, clicar em **"N arquivos"** para conferir o painel de fontes.
+
+Regras que sustentam isso:
+
+- **O código não tem lista de arquivos.** Ele lista a pasta `Dashboard` e pega todo
+  arquivo cujo nome comece com "producao" e termine em `.xlsx`/`.xls`. Para começar a ter
+  2027, basta soltar `producao_2027.xlsx` lá.
+- **O nome é comparado sem acento e sem diferenciar maiúsculas** — `producao_2024.xlsx`,
+  `Produção_2024.xlsx` e `PRODUCAO 2024.XLSX` valem igual. Temporários do Excel (`~$…`)
+  são ignorados. Se nenhum arquivo casar, o dashboard mostra na tela o que existe na pasta.
+- **Um ano por arquivo, sem sobreposição.** Linhas idênticas repetidas entre arquivos são
+  descartadas e reportadas no painel de fontes, mas se a *mesma* apólice aparecer em dois
+  arquivos com `SITUAÇÃO` diferente as duas versões coexistem e inflam a carteira.
+- **Anos fechados são imutáveis.** É o que faz o cache valer: o browser guarda as linhas já
+  parseadas por arquivo (IndexedDB `dash-cache`, chaveado pelo `cTag` do SharePoint) e só
+  rebaixa o que mudou. Para forçar releitura: botão **"Limpar cache e recarregar"** no painel
+  de fontes, ou `limparCacheFontes()` no console.
+- **A produção não passa mais pelo sync automático** (`scripts/sync_producao.py`), justamente
+  para o script não sobrescrever um `producao.xlsx` que concorreria com os arquivos por ano.
+  Sinistros continuam automáticos.
 
 ---
 

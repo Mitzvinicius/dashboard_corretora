@@ -6,6 +6,9 @@ const compPivotCollapsed = new Set();   // seguradoras recolhidas no modo hierá
 let compPeriodManual = false; // true quando o usuário define o período direto na aba (botão "Comparar")
 let CLAIMS = [], FD_CLAIMS = [];
 let claimsSourceCounts = { sinistrosAvisados: 0, sinistrosPagamentos: 0 };
+// Manifesto das planilhas de produção que formaram o ALL atual — uma entrada por
+// arquivo lido (ver loadProducaoFromSources). Alimenta o painel "Fontes".
+let prodSources = [];
 let sinistralView = 'seg', rentabilView = 'seg';
 const PROD_TABS = ['visao-geral', 'producao', 'retencao', 'comparativo', 'metas', 'crosssell'];
 let activeTipos = new Set();
@@ -437,6 +440,65 @@ function parseProducaoArrayBuffer(buf) {
   });
 }
 
+// ── União de várias planilhas de produção ──────────────────────────────────────
+// A base vive no SharePoint quebrada em um arquivo por ano (producao_2021.xlsx,
+// producao_2022.xlsx, …). Cada arquivo é parseado isoladamente e concatenado em ALL.
+//
+// A chave de dedup é deliberadamente LARGA: 'APÓLICE' não identifica uma linha
+// (endossos e faturas repetem o número da apólice-mãe — ver METRICAS.md §1.2), então
+// só descartamos o que é byte a byte a mesma linha exportada duas vezes. Isso protege
+// contra o caso real de sobreposição — o producao.xlsx legado convivendo com o
+// producao_<ano>.xlsx — sem nunca fundir endossos distintos.
+function prodDedupeKey(r) {
+  return [r.apolice, r.endosso, r.tipoDoc, fmtD(r.vig), fmtD(r.em),
+          r.cli, r.seg, r.ramo, r.premio, r.com].join('|');
+}
+
+// Intervalo de anos de início de vigência presente nas linhas — mostrado no painel
+// de fontes para flagrar arquivo fora do ano que o nome promete.
+// Sem Math.min(...anos): um arquivo de ano cheio passa de 100 mil linhas e o spread
+// estoura a pilha de argumentos.
+function prodYearRange(rows) {
+  let min = Infinity, max = -Infinity;
+  for (const r of rows) {
+    if (!r.vig) continue;
+    const y = r.vig.getFullYear();
+    if (!y) continue;
+    if (y < min) min = y;
+    if (y > max) max = y;
+  }
+  return min === Infinity ? null : { min, max };
+}
+
+// sources: [{ name, rows, lastModified?, cached? }] — 'rows' já normalizadas
+// (vindas do parse ou do cache). Preenche ALL e prodSources.
+function loadProducaoFromSources(sources) {
+  const merged = [];
+  const seen = new Set();
+  prodSources = [];
+  for (const src of sources) {
+    let dup = 0;
+    for (const r of src.rows) {
+      const k = prodDedupeKey(r);
+      if (seen.has(k)) { dup++; continue; }
+      seen.add(k);
+      merged.push(r);
+    }
+    prodSources.push({
+      name: src.name, total: src.rows.length, dup, anos: prodYearRange(src.rows),
+      lastModified: src.lastModified || null, cached: !!src.cached
+    });
+  }
+  ALL = merged;
+  console.table(prodSources.map(s => ({
+    arquivo: s.name, linhas: s.total, duplicadas: s.dup,
+    anos: s.anos ? (s.anos.min === s.anos.max ? String(s.anos.min) : `${s.anos.min}–${s.anos.max}`) : '—',
+    cache: s.cached ? 'sim' : 'não'
+  })));
+  const totalDup = prodSources.reduce((a, s) => a + s.dup, 0);
+  if (totalDup) console.warn(`[produção] ${fN(totalDup)} linhas duplicadas descartadas — confira se dois arquivos cobrem o mesmo período.`);
+}
+
 // ── Formatação de documento (CPF/CNPJ) ─────────────────────────────────────────
 function formatDoc(digits, tipoPessoa) {
   if (!digits) return '—';
@@ -506,7 +568,12 @@ function loadClaimsFromBuffers(buffersById) {
 
 function updateDashHeader() {
   const parts = [];
-  if (hasProducaoData()) parts.push('Produção: ' + fN(ALL.length));
+  if (hasProducaoData()) {
+    let prodPart = 'Produção: ' + fN(ALL.length);
+    const n = prodSources.length;
+    if (n) prodPart += ` (<button type="button" class="src-link" onclick="openFontesModal()">${n} ${n === 1 ? 'arquivo' : 'arquivos'}</button>)`;
+    parts.push(prodPart);
+  }
   if (hasSinistrosData()) {
     let sinPart = 'Sinistros: ' + fN(CLAIMS.length);
     const av = claimsSourceCounts.sinistrosAvisados;
@@ -514,12 +581,62 @@ function updateDashHeader() {
     if (av || pg) sinPart += ' (avisados ' + fN(av) + ' · pagos ' + fN(pg) + ')';
     parts.push(sinPart);
   }
-  document.getElementById('dash-subtitle').textContent = parts.length ? parts.join(' · ') : 'Nenhuma fonte carregada';
+  document.getElementById('dash-subtitle').innerHTML = parts.length ? parts.join(' · ') : 'Nenhuma fonte carregada';
   if (hasProducaoData()) document.getElementById('rec-badge').textContent = fN(FD.length) + ' registros';
   else if (hasSinistrosData()) document.getElementById('rec-badge').textContent = fN(CLAIMS.length) + ' sinistros';
   else document.getElementById('rec-badge').textContent = '—';
   const filters = document.querySelector('.filters');
   if (filters) filters.style.opacity = hasProducaoData() ? '1' : '0.45';
+}
+
+// ── Painel de fontes ───────────────────────────────────────────────────────────
+// Mostra de onde veio cada pedaço do ALL. Serve para responder de relance as duas
+// perguntas que a base quebrada por ano cria: "faltou algum ano?" e "o ano corrente
+// está atualizado?" — além de denunciar sobreposição entre arquivos.
+function escHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function fontesEscHandler(e) { if (e.key === 'Escape') closeFontesModal(); }
+
+function openFontesModal() {
+  const body = document.getElementById('fontes-modal-body');
+  const totalDup = prodSources.reduce((a, s) => a + s.dup, 0);
+  const linhas = prodSources.map(s => {
+    const anos = s.anos ? (s.anos.min === s.anos.max ? String(s.anos.min) : `${s.anos.min}–${s.anos.max}`) : '—';
+    const quando = s.lastModified ? new Date(s.lastModified).toLocaleDateString('pt-BR') : '—';
+    return `<tr>
+      <td>${escHtml(s.name)}${s.cached ? ' <span class="fontes-tag">cache</span>' : ''}</td>
+      <td class="num">${fN(s.total)}</td>
+      <td>${anos}</td>
+      <td>${quando}</td>
+      <td class="num">${s.dup ? fN(s.dup) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML = `
+    <table class="fontes-table">
+      <thead><tr><th>Arquivo</th><th class="num">Linhas</th><th>Anos</th><th>Atualizado</th><th class="num">Duplicadas</th></tr></thead>
+      <tbody>${linhas}</tbody>
+      <tfoot><tr><td>Total em memória</td><td class="num">${fN(ALL.length)}</td><td colspan="2"></td><td class="num">${totalDup ? fN(totalDup) : '—'}</td></tr></tfoot>
+    </table>
+    ${totalDup ? '<p class="fontes-warn">Há linhas repetidas entre arquivos — elas foram descartadas, mas confira se dois arquivos cobrem o mesmo período.</p>' : ''}
+    <p class="fontes-hint">A pasta <strong>Dashboard</strong> no SharePoint aceita um arquivo por ano
+    (<code>producao_2021.xlsx</code>, <code>producao_2022.xlsx</code>, …). Basta soltar um arquivo novo lá.</p>`;
+
+  document.getElementById('fontes-modal').style.display = 'flex';
+  document.addEventListener('keydown', fontesEscHandler);
+}
+
+function closeFontesModal() {
+  document.getElementById('fontes-modal').style.display = 'none';
+  document.removeEventListener('keydown', fontesEscHandler);
+}
+
+async function recarregarFontes() {
+  closeFontesModal();
+  await limparCacheFontes();
+  location.reload();
 }
 
 function initDashboard(opts) {
@@ -574,7 +691,7 @@ function initDashboard(opts) {
 
 function applySharePointData(payloads, warnings) {
   try {
-    if (payloads.producao) ALL = parseProducaoArrayBuffer(payloads.producao);
+    if (payloads.producao && payloads.producao.length) loadProducaoFromSources(payloads.producao);
     loadClaimsFromBuffers({
       sinistrosAvisados: payloads.sinistrosAvisados || null,
       sinistrosPagamentos: payloads.sinistrosPagamentos || null
@@ -607,10 +724,26 @@ const _SP_LIBRARY = 'Santolin';
 const _SP_FOLDER  = 'Dashboard';
 const _SP_SCOPES  = ['https://graph.microsoft.com/Files.Read.All'];
 const _GRAPH      = 'https://graph.microsoft.com/v1.0';
-const _SP_FILES   = { producao: 'producao.xlsx', sinistrosAvisados: 'sinistrosAvisados.xlsx', sinistrosPagamentos: 'sinistrosPagamentos.xlsx' };
+const _SP_FILES   = { sinistrosAvisados: 'sinistrosAvisados.xlsx', sinistrosPagamentos: 'sinistrosPagamentos.xlsx' };
+// A produção NÃO tem nome fixo: a pasta Dashboard guarda um arquivo por ano
+// (producao_2021.xlsx, producao_2022.xlsx, …) e o dashboard lê todos que casarem.
+// Para passar a ter 2027 basta soltar producao_2027.xlsx lá — sem tocar no código.
+// O padrão também casa com o 'producao.xlsx' antigo, então a transição é contínua.
+//
+// O nome é comparado SEM acento e em minúsculas, porque quem salva o arquivo
+// digita tanto 'producao_2021.xlsx' quanto 'Produção 2021.xlsx' — as duas formas
+// valem. Aceita .xlsx e .xls.
+const _SP_PROD_PATTERN = /^producao.*\.xlsx?$/;
+const _normFileName = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function isProducaoFileName(name) {
+  return _SP_PROD_PATTERN.test(_normFileName(name)) && !String(name).startsWith('~$');
+}
 
 let _msalApp   = null;
 let _spDriveId = null;
+// Nomes vistos na pasta Dashboard na última listagem — só para a mensagem de erro
+// quando nenhum arquivo casa com o padrão de produção.
+let _spFolderNames = [];
 
 function _buildMsal() {
   if (_msalApp) return _msalApp;
@@ -692,11 +825,116 @@ async function _spGetDriveId(token) {
   return _spDriveId;
 }
 
-async function _spFetchAndLoad(token, mode) {
-  const keys = mode === 'prod'
-    ? ['producao', 'sinistrosAvisados', 'sinistrosPagamentos']
-    : ['sinistrosAvisados', 'sinistrosPagamentos'];
+// Lista os arquivos de produção da pasta Dashboard. Se a listagem falhar (permissão,
+// rede), devolve o arquivo único legado para o dashboard seguir funcionando como antes.
+async function _spListProducaoFiles(token, driveId) {
+  // 'file' e 'folder' precisam estar no $select — o Graph só devolve as propriedades
+  // pedidas. O filtro descarta pelo 'folder' (e não exige o 'file'): assim, se a
+  // faceta vier ausente, os arquivos continuam passando em vez de sumirem todos.
+  const url = `${_GRAPH}/drives/${driveId}/root:/${_SP_FOLDER}:/children`
+            + `?$select=id,name,size,file,folder,eTag,cTag,lastModifiedDateTime&$top=200`;
+  try {
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const { value = [] } = await resp.json();
+    const files = value
+      .filter(f => !f.folder && isProducaoFileName(f.name))
+      .map(f => ({
+        id: f.id, name: f.name, size: f.size,
+        tag: f.cTag || f.eTag || String(f.size),
+        lastModified: f.lastModifiedDateTime
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    if (files.length) {
+      console.info('[SP] Planilhas de produção encontradas:', files.map(f => f.name).join(', '));
+      return files;
+    }
+    // Diagnóstico: mostrar o que REALMENTE está na pasta é o que permite descobrir
+    // que o arquivo foi salvo com outro nome.
+    _spFolderNames = value.map(f => f.name);
+    console.warn('[SP] Nenhum arquivo casou com o padrão de produção. A pasta contém:',
+      _spFolderNames.join(', ') || '(vazia)');
+  } catch (e) {
+    console.warn('[SP] Listagem da pasta falhou, usando producao.xlsx:', e.message);
+  }
+  return [{ id: null, name: 'producao.xlsx', size: 0, tag: null, lastModified: null }];
+}
 
+// ── Cache local das planilhas de produção (IndexedDB) ─────────────────────────
+// Sem cache, cada carga rebaixa e reparseia todos os anos (~9 MB por arquivo, parse
+// síncrono). Guardamos as linhas já normalizadas por arquivo, com o cTag do
+// SharePoint como versão: anos fechados nunca mais são baixados e só o arquivo que
+// mudou volta pela rede. Toda a camada é best-effort — qualquer falha (modo privativo,
+// cota, navegador sem IndexedDB) apenas devolve null e o fluxo segue pela rede.
+const _CACHE_DB = 'dash-cache', _CACHE_STORE = 'producao';
+
+function _cacheOpen() {
+  return new Promise(resolve => {
+    try {
+      const req = indexedDB.open(_CACHE_DB, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(_CACHE_STORE)) db.createObjectStore(_CACHE_STORE, { keyPath: 'name' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+}
+
+function _cacheGet(db, name) {
+  return new Promise(resolve => {
+    try {
+      const req = db.transaction(_CACHE_STORE, 'readonly').objectStore(_CACHE_STORE).get(name);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+}
+
+function _cachePut(db, entry) {
+  return new Promise(resolve => {
+    try {
+      const tx = db.transaction(_CACHE_STORE, 'readwrite');
+      tx.objectStore(_CACHE_STORE).put(entry);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    } catch { resolve(false); }
+  });
+}
+
+// Descarta entradas de arquivos que não estão mais na pasta — sem isso, renomear
+// producao.xlsx para producao_2026.xlsx deixaria a versão antiga ocupando o cache
+// para sempre (cada entrada guarda as linhas de um ano inteiro).
+function _cachePrune(db, manter) {
+  return new Promise(resolve => {
+    try {
+      const store = db.transaction(_CACHE_STORE, 'readwrite').objectStore(_CACHE_STORE);
+      const req = store.getAllKeys();
+      req.onsuccess = () => {
+        (req.result || []).forEach(k => { if (!manter.has(k)) store.delete(k); });
+        resolve(true);
+      };
+      req.onerror = () => resolve(false);
+    } catch { resolve(false); }
+  });
+}
+
+// Exposta no console e no painel de fontes, para forçar releitura completa.
+async function limparCacheFontes() {
+  const db = await _cacheOpen();
+  if (!db) return false;
+  return new Promise(resolve => {
+    try {
+      const tx = db.transaction(_CACHE_STORE, 'readwrite');
+      tx.objectStore(_CACHE_STORE).clear();
+      tx.oncomplete = () => { console.info('[cache] Fontes de produção limpas — recarregue o dashboard.'); resolve(true); };
+      tx.onerror = () => resolve(false);
+    } catch { resolve(false); }
+  });
+}
+
+async function _spFetchAndLoad(token, mode) {
   document.getElementById('landing-screen').style.display = 'none';
   document.getElementById('upload-screen').style.display = 'flex';
   document.getElementById('upload-zone').style.display = 'none';
@@ -707,27 +945,71 @@ async function _spFetchAndLoad(token, mode) {
   try {
     const driveId = await _spGetDriveId(token);
     const payloads = {}, warnings = [];
+
+    const prodFiles = mode === 'prod' ? await _spListProducaoFiles(token, driveId) : [];
+    const sinKeys   = ['sinistrosAvisados', 'sinistrosPagamentos'];
+    const totalFiles = prodFiles.length + sinKeys.length;
     let done = 0;
-    for (const key of keys) {
-      setProgress(20 + Math.round(done / keys.length * 65), `Baixando ${_SP_FILES[key]}...`);
+    const bump = label => setProgress(20 + Math.round(done / totalFiles * 65), label);
+
+    const db = prodFiles.length ? await _cacheOpen() : null;
+    if (db) await _cachePrune(db, new Set(prodFiles.map(f => f.name)));
+
+    // Produção e sinistros baixam em paralelo — antes era um for/await sequencial,
+    // que com um arquivo por ano ficaria lento demais.
+    const prodTasks = prodFiles.map(async f => {
+      const hit = f.tag && db ? await _cacheGet(db, f.name) : null;
+      if (hit && hit.tag === f.tag) {
+        done++; bump(`${f.name} (cache)`);
+        return { name: f.name, rows: hit.rows, lastModified: f.lastModified, cached: true };
+      }
+      const url = f.id
+        ? `${_GRAPH}/drives/${driveId}/items/${f.id}/content`
+        : `${_GRAPH}/drives/${driveId}/root:/${_SP_FOLDER}/${f.name}:/content`;
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      done++; bump(`Baixando ${f.name}...`);
+      if (!resp.ok) {
+        if (resp.status !== 404) warnings.push(`${f.name}: HTTP ${resp.status}`);
+        return null;
+      }
+      const rows = parseProducaoArrayBuffer(await resp.arrayBuffer());
+      if (db && f.tag) await _cachePut(db, { name: f.name, tag: f.tag, rows });
+      return { name: f.name, rows, lastModified: f.lastModified, cached: false };
+    });
+
+    const sinTasks = sinKeys.map(async key => {
       const url  = `${_GRAPH}/drives/${driveId}/root:/${_SP_FOLDER}/${_SP_FILES[key]}:/content`;
       const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      done++;
+      done++; bump(`Baixando ${_SP_FILES[key]}...`);
       if (resp.ok) payloads[key] = await resp.arrayBuffer();
       else if (resp.status !== 404) warnings.push(`${key}: HTTP ${resp.status}`);
+    });
+
+    const prodSrc = (await Promise.all(prodTasks)).filter(Boolean);
+    await Promise.all(sinTasks);
+    if (mode === 'prod') payloads.producao = prodSrc;
+
+    // Em modo produção, não adianta seguir com os sinistros: o usuário pediu produção.
+    // A mensagem lista o que existe na pasta, que é o que resolve o caso mais comum —
+    // arquivo salvo com um nome que não casa com o padrão.
+    if (mode === 'prod' && !prodSrc.length) {
+      const achados = _spFolderNames.length ? ` A pasta Dashboard contém: ${_spFolderNames.join(', ')}.` : '';
+      throw new Error('Nenhuma planilha de produção encontrada. Os arquivos devem se chamar '
+        + `producao_<ano>.xlsx (ex.: producao_2021.xlsx).${achados}`);
     }
-    if (!Object.keys(payloads).length) throw new Error('Nenhum arquivo encontrado na pasta Dashboard');
+    if (!prodSrc.length && !payloads.sinistrosAvisados && !payloads.sinistrosPagamentos)
+      throw new Error('Nenhum arquivo encontrado na pasta Dashboard');
     setProgress(95, 'Processando planilhas...');
     await new Promise(r => setTimeout(r, 50));
     applySharePointData(payloads, warnings);
   } catch (err) {
     console.warn('[SP fetch]', err);
     document.getElementById('progress-wrap').style.display = 'none';
-    _spFallback(mode);
+    _spFallback(mode, err.message);
   }
 }
 
-function _spFallback(mode) {
+function _spFallback(mode, msg) {
   if (mode === 'sin') {
     document.getElementById('landing-screen').style.display = 'none';
     document.getElementById('upload-screen').style.display = 'none';
@@ -745,6 +1027,13 @@ function _spFallback(mode) {
     document.getElementById('upload-screen').style.display = 'flex';
     document.getElementById('upload-zone').style.display = '';
     document.getElementById('progress-wrap').style.display = 'none';
+    // Cair na tela de upload sem dizer por quê é o pior desfecho possível: o usuário
+    // não descobre que o problema foi o nome do arquivo no SharePoint.
+    const box = document.getElementById('sp-error');
+    if (box) {
+      if (msg) { box.textContent = msg; box.style.display = ''; }
+      else box.style.display = 'none';
+    }
   }
 }
 
@@ -766,7 +1055,9 @@ function handleFile(file) {
     if (!dashVisible) setProgress(30, 'Processando planilha...');
     setTimeout(() => {
       try {
-        ALL = parseProducaoArrayBuffer(e.target.result);
+        // Upload manual continua sendo de arquivo único e substitui a base inteira —
+        // é o caminho de contingência quando o SharePoint não responde.
+        loadProducaoFromSources([{ name: file.name, rows: parseProducaoArrayBuffer(e.target.result) }]);
         if (!dashVisible) {
           setProgress(100, 'Pronto!');
           setTimeout(() => initDashboard({ preferredTab: 'visao-geral' }), 300);

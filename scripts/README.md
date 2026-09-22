@@ -6,9 +6,14 @@ Relatórios configurados (default):
 
 | Keyword no assunto | Arquivo final no SharePoint |
 |---|---|
-| `producao` | `producao.xlsx` |
 | `sinistroaberto` | `sinistrosAvisados.xlsx` |
 | `sinistropgto` | `sinistrosPagamentos.xlsx` |
+
+> **A produção saiu deste script.** A base virou um arquivo por ano
+> (`producao_2021.xlsx`, `producao_2022.xlsx`, …) enviado manualmente para
+> `/Santolin/Dashboard/` — ver *"Como atualizar os dados de produção"* no `SKILL.md`.
+> Se o script voltasse a gravar `producao.xlsx`, esse arquivo se sobreporia aos
+> arquivos por ano e as linhas repetidas seriam contadas duas vezes.
 
 Pensado para rodar agendado no **Task Scheduler do Windows**, sem interação humana, usando autenticação **app-only** (client credentials).
 
@@ -98,25 +103,23 @@ Saída esperada (no console e em `sync_producao.log`):
 
 ```
 2026-04-29 14:30:01 | INFO | === Inicio do sync ===
-2026-04-29 14:30:01 | INFO | Caixa: relatorios.dash@santolinconsultoria.com.br | Relatorios configurados: 3
+2026-04-29 14:30:01 | INFO | Caixa: relatorios.dash@santolinconsultoria.com.br | Relatorios configurados: 2
 2026-04-29 14:30:02 | INFO | Token OK
 2026-04-29 14:30:02 | INFO | E-mails recentes carregados: 100
-2026-04-29 14:30:03 | INFO | [producao] 'ENC: Agendamento de Relatorio: producao' (2026-04-29T13:15:00Z)
-2026-04-29 14:30:04 | INFO | [producao] Anexo baixado: RptAnaliseProducao.XLSX (9660 KB)
-2026-04-29 14:30:06 | INFO | [producao] Upload OK -> /Santolin/Dashboard/producao.xlsx
-2026-04-29 14:30:07 | INFO | [producao] E-mail movido para 'Processados'
-2026-04-29 14:30:08 | INFO | [sinistroaberto] 'ENC: Agendamento de Relatorio: sinistroaberto' (2026-04-29T13:20:00Z)
-... (mesmos passos para sinistroaberto e sinistropgto)
-2026-04-29 14:30:18 | INFO | === Resumo: 3 ok / 0 falha / 0 sem e-mail ===
+2026-04-29 14:30:03 | INFO | [sinistroaberto] 'ENC: Agendamento de Relatorio: sinistroaberto' (2026-04-29T13:20:00Z)
+2026-04-29 14:30:04 | INFO | [sinistroaberto] Anexo baixado: RptSinistrosAvisados.XLSX (412 KB)
+2026-04-29 14:30:06 | INFO | [sinistroaberto] Upload OK -> /Santolin/Dashboard/sinistrosAvisados.xlsx
+2026-04-29 14:30:07 | INFO | [sinistroaberto] E-mail movido para 'Processados'
+... (mesmos passos para sinistropgto)
+2026-04-29 14:30:18 | INFO | === Resumo: 2 ok / 0 falha / 0 sem e-mail ===
 ```
 
 Se rodar de novo imediatamente (todos já em Processados), deve logar:
 
 ```
-2026-04-29 14:31:00 | WARNING | [producao] Sem e-mail novo — pulando
 2026-04-29 14:31:00 | WARNING | [sinistroaberto] Sem e-mail novo — pulando
 2026-04-29 14:31:00 | WARNING | [sinistropgto] Sem e-mail novo — pulando
-2026-04-29 14:31:00 | INFO | === Resumo: 0 ok / 0 falha / 3 sem e-mail ===
+2026-04-29 14:31:00 | INFO | === Resumo: 0 ok / 0 falha / 2 sem e-mail ===
 ```
 
 ### Adicionando ou removendo relatórios
@@ -125,7 +128,6 @@ Edite a lista `REPORTS` no topo de `sync_producao.py`:
 
 ```python
 REPORTS = [
-    {"keyword": "producao",       "sp_filename": "producao.xlsx"},
     {"keyword": "sinistroaberto", "sp_filename": "sinistrosAvisados.xlsx"},
     {"keyword": "sinistropgto",   "sp_filename": "sinistrosPagamentos.xlsx"},
     # Adicione aqui mais relatórios no mesmo formato.

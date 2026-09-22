@@ -1,8 +1,11 @@
 """
 Servidor local do Dashboard Santolin.
 
-Baixa os três Excel da pasta Dashboard no SharePoint usando as credenciais
+Baixa as planilhas da pasta Dashboard no SharePoint usando as credenciais
 do scripts/.env e abre o dashboard em http://localhost:8080
+
+A producao e lida como um arquivo por ano (producao_2021.xlsx, producao_2022.xlsx,
+...): a pasta e listada e tudo que casa com PROD_PATTERN e baixado.
 
 Uso:
     python launch_dashboard.py
@@ -13,7 +16,9 @@ Dependências: msal, requests, python-dotenv
 
 import json
 import os
+import re
 import sys
+import unicodedata
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -32,10 +37,22 @@ SP_LIBRARY  = "Santolin"
 SP_FOLDER   = "Dashboard"
 
 SP_FILES = {
-    "producao":            "producao.xlsx",
     "sinistrosAvisados":   "sinistrosAvisados.xlsx",
     "sinistrosPagamentos": "sinistrosPagamentos.xlsx",
 }
+
+# A produção não tem nome fixo: é um arquivo por ano na mesma pasta.
+# O nome é comparado sem acento e em minúsculas, igual ao main.js, porque quem salva
+# o arquivo digita tanto 'producao_2021.xlsx' quanto 'Produção 2021.xlsx'.
+PROD_PATTERN = re.compile(r"^producao.*\.xlsx?$")
+
+
+def is_producao_file(nome: str) -> bool:
+    sem_acento = "".join(
+        c for c in unicodedata.normalize("NFD", nome or "")
+        if unicodedata.category(c) != "Mn"
+    ).lower()
+    return bool(PROD_PATTERN.match(sem_acento)) and not nome.startswith("~$")
 
 BASE_DIR  = Path(__file__).resolve().parent
 CACHE_DIR = BASE_DIR / "scripts" / "cache"
@@ -67,6 +84,25 @@ def get_drive_id(token: str) -> str:
         nomes = ", ".join(f'"{d.get("name")}"' for d in drives)
         raise RuntimeError(f"Biblioteca '{SP_LIBRARY}' não encontrada. Disponíveis: {nomes}")
     return target["id"]
+
+
+def list_producao_files(token: str, drive_id: str) -> list[str]:
+    """Nomes dos arquivos de produção na pasta Dashboard (um por ano)."""
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"{GRAPH}/drives/{drive_id}/root:/{SP_FOLDER}:/children?$select=name&$top=200"
+    try:
+        resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        nomes = [
+            item["name"] for item in resp.json().get("value", [])
+            if is_producao_file(item.get("name", ""))
+        ]
+        if nomes:
+            return sorted(nomes)
+    except Exception as e:
+        print(f"  Erro ao listar a pasta: {e}")
+    print("  Nenhum arquivo de produção listado — tentando producao.xlsx")
+    return ["producao.xlsx"]
 
 
 def download_file(token: str, drive_id: str, filename: str) -> bytes | None:
@@ -103,7 +139,13 @@ def fetch_sharepoint_files() -> None:
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    for key, filename in SP_FILES.items():
+    print("→ Listando planilhas de produção...")
+    # Arquivos de produção são chaveados pelo próprio nome; os de sinistros mantêm
+    # as chaves fixas porque o endpoint /api/<chave> depende delas.
+    alvos = {nome: nome for nome in list_producao_files(token, drive_id)}
+    alvos.update(SP_FILES)
+
+    for key, filename in alvos.items():
         print(f"→ Baixando {filename}...")
         try:
             content = download_file(token, drive_id, filename)

@@ -48,6 +48,7 @@
 
   <!-- Upload -->
   <div id="upload-screen" style="display:none">
+    <p id="sp-error" class="sp-error" style="display:none"></p>
     <div id="upload-zone" onclick="document.getElementById('fi1').click()"
       ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
       ondrop="handleDrop(event)">
@@ -700,6 +701,17 @@
       </div>
 
     </div><!-- /tab-comparativo -->
+
+    <!-- Modal de fontes — quais planilhas de produção formaram a base atual -->
+    <div class="export-modal-overlay" id="fontes-modal" style="display:none"
+      onclick="if(event.target===this) closeFontesModal()">
+      <div class="export-modal-card fontes-card">
+        <div class="export-modal-title">Fontes de produção</div>
+        <div id="fontes-modal-body"></div>
+        <button class="export-modal-option" onclick="recarregarFontes()">&#8635; Limpar cache e recarregar</button>
+        <button class="export-modal-cancel" onclick="closeFontesModal()">Fechar</button>
+      </div>
+    </div>
 
     <!-- Modal de exportação — Comparativo por seguradora e ramo -->
     <div class="export-modal-overlay" id="comp-pivot-export-modal" style="display:none"

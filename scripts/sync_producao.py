@@ -8,9 +8,11 @@ correspondente em /Santolin/Dashboard/ no SharePoint e move o e-mail para a
 subpasta "Processados".
 
 Relatorios atuais:
-  - 'producao'       -> producao.xlsx
   - 'sinistroaberto' -> sinistrosAvisados.xlsx
   - 'sinistropgto'   -> sinistrosPagamentos.xlsx
+
+A producao NAO passa mais por aqui: virou um arquivo por ano (producao_<ano>.xlsx)
+enviado manualmente para /Santolin/Dashboard/ (ver SKILL.md).
 
 Para adicionar/remover relatorios, edite a lista REPORTS abaixo.
 
@@ -42,8 +44,14 @@ PROCESSED_FOLDER_NAME = "Processados"
 # Lista de relatorios a sincronizar.
 # keyword     = substring (case-insensitive) procurada no assunto do e-mail
 # sp_filename = nome final do arquivo em /Santolin/Dashboard/
+#
+# A producao saiu desta lista: a base passou a ser mantida como um arquivo por ano
+# (producao_2021.xlsx, producao_2022.xlsx, ...) enviado manualmente para a pasta
+# Dashboard. Se este script voltasse a gravar 'producao.xlsx', esse arquivo se
+# sobreporia aos arquivos por ano e as linhas repetidas seriam contadas duas vezes.
+# Para reautomatizar, o relatorio do ERP precisaria vir recortado por ano civil e o
+# sp_filename apontar para producao_<ano>.xlsx.
 REPORTS = [
-    {"keyword": "producao",       "sp_filename": "producao.xlsx"},
     {"keyword": "sinistroaberto", "sp_filename": "sinistrosAvisados.xlsx"},
     {"keyword": "sinistropgto",   "sp_filename": "sinistrosPagamentos.xlsx"},
 ]
