@@ -226,6 +226,17 @@ continuam sendo carteira de verdade e seguem contando aqui.
 O filtro vale para **todos os anos**, inclusive os fechados, senão a série
 compararia critérios diferentes entre uma barra e outra.
 
+### Crescimento ano a ano
+
+Cada barra traz, acima do valor, a variação percentual contra a barra anterior
+(verde pra cima, vermelho pra baixo), no mesmo formato da faixa de variação do
+gráfico mensal. O primeiro ano da série não tem com o que comparar e fica sem o
+rótulo; ano seguinte a um zerado também, porque não há base para o percentual.
+O tooltip repete a variação com a diferença absoluta e o ano de referência.
+
+Vale só neste gráfico. Em "Clientes por nível" as barras são faixas, não uma série
+temporal — comparar o nível 2 com o nível 1 não significaria nada.
+
 ### Onde mais o critério vale
 
 Os dois filtros valem também em **"Clientes por nível"** (`tvExClientes`), que conta

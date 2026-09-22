@@ -170,6 +170,11 @@ const axisClr = () => dark() ? '#8b949e' : '#888';
 const gridClr = () => dark() ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.055)';
 const labelClr = () => dark() ? '#c9d1d9' : '#444';
 const borderClr = () => dark() ? '#161b22' : '#fff';
+// Canvas não enxerga variável CSS: lê o valor computado pra os rótulos desenhados
+// no gráfico usarem exatamente o mesmo verde/vermelho das badges de variação.
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const posClr = () => cssVar('--pos-text') || '#2DD4A0';
+const negClr = () => cssVar('--neg-text') || '#FF8080';
 
 darkQuery.addEventListener('change', () => {
   if (typeof ALL !== 'undefined' && ALL.length > 0) {
@@ -4570,9 +4575,21 @@ function buildTvAnoCarteira() {
   return { labels, data };
 }
 
+// Variação percentual entre duas barras vizinhas, no mesmo formato da faixa de
+// variação do gráfico mensal (ver renderEvolucao): sinal explícito e uma casa.
+const fVarPct = pct => (pct >= 0 ? '+' : '−') + Math.abs(pct * 100).toFixed(1).replace('.', ',') + '%';
+
 // Rótulo com o valor acima de cada barra do dataset indicado (só a barra, não
 // a linha de tendência sobreposta — senão o rótulo desenharia duas vezes).
-function tvBarValueLabelPlugin(datasetIndex) {
+//
+// Com opts.variacao, escreve mais acima a variação em relação à barra anterior,
+// verde pra cima e vermelho pra baixo. É opcional porque só faz sentido quando as
+// barras formam uma série temporal: em "Clientes por nível" o eixo são faixas, e
+// comparar o nível 2 com o nível 1 não significaria nada.
+// A primeira barra não tem com o que comparar e fica sem o rótulo, assim como a
+// que vem depois de um ano zerado (não há base para o percentual).
+function tvBarValueLabelPlugin(datasetIndex, opts) {
+  const variacao = !!(opts && opts.variacao);
   return {
     id: 'tvBarValueLabel',
     afterDatasetsDraw(chart) {
@@ -4580,15 +4597,22 @@ function tvBarValueLabelPlugin(datasetIndex) {
       if (!meta || meta.hidden) return;
       const ctx = chart.ctx;
       ctx.save();
-      ctx.font = '700 12px Inter, system-ui, sans-serif';
       ctx.textBaseline = 'bottom';
       ctx.textAlign = 'center';
-      ctx.fillStyle = labelClr();
       const ds = chart.data.datasets[datasetIndex];
       meta.data.forEach((el, i) => {
         const v = ds.data[i];
         if (v == null) return;
+        ctx.font = '700 12px Inter, system-ui, sans-serif';
+        ctx.fillStyle = labelClr();
         ctx.fillText(fN(v), el.x, el.y - 6);
+        if (!variacao || i === 0) return;
+        const prev = ds.data[i - 1];
+        if (prev == null || prev === 0) return;
+        const pct = (v - prev) / prev;
+        ctx.font = '700 11px Inter, system-ui, sans-serif';
+        ctx.fillStyle = pct >= 0 ? posClr() : negClr();
+        ctx.fillText(fVarPct(pct), el.x, el.y - 22);
       });
       ctx.restore();
     },
@@ -4610,14 +4634,30 @@ function renderTvExAnoChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { top: 24 } },
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fN(ctx.raw) + ' apólices' } } },
+      // 44 (e não 24) porque agora são duas linhas de rótulo acima da barra mais
+      // alta: o valor e, acima dele, a variação contra o ano anterior.
+      layout: { padding: { top: 44 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => fN(ctx.raw) + ' apólices',
+            afterLabel: ctx => {
+              if (ctx.datasetIndex !== 0 || ctx.dataIndex === 0) return '';
+              const prev = ctx.dataset.data[ctx.dataIndex - 1];
+              if (prev == null || prev === 0) return '';
+              const diff = ctx.raw - prev;
+              return `${fVarPct(diff / prev)} vs. ${ctx.chart.data.labels[ctx.dataIndex - 1]} (${diff >= 0 ? '+' : '−'}${fN(Math.abs(diff))})`;
+            },
+          },
+        },
+      },
       scales: {
         x: { ticks: { color: lc, font: { size: 12 } }, grid: { display: false } },
         y: { beginAtZero: true, ticks: { color: ac, font: { size: 11 }, precision: 0 }, grid: { color: gc } },
       },
     },
-    plugins: [tvBarValueLabelPlugin(0)],
+    plugins: [tvBarValueLabelPlugin(0, { variacao: true })],
   });
 }
 
