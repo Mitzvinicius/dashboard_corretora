@@ -124,7 +124,7 @@ Regras que sustentam isso:
 ### Seguros saúde (`saude_fernando.xlsx`)
 
 O ERP lança os saúdes com prêmio e comissão zerados. Os valores reais vão numa planilha
-à parte, na mesma pasta: uma linha por contrato, vinculada pela `APÓLICE`. O modelo com
+à parte, na mesma pasta: uma linha por contrato, vinculada pela `APÓLICE` (ou pelo CPF/CNPJ + vigência, quando ainda não há número). O modelo com
 os cabeçalhos é baixado no painel de fontes (**"Baixar modelo da planilha de saúde"**).
 O arquivo é opcional; se não existir, o dashboard carrega normalmente. As regras de
 cálculo e a forma de evitar duplicação com as faturas mensais estão em `METRICAS.md` §8.

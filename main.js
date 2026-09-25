@@ -509,10 +509,14 @@ function loadProducaoFromSources(sources) {
 // O ERP não consegue lançar a remuneração do seguro saúde — agenciamento sobre o
 // prêmio líquido das 3 primeiras parcelas + 2% ao ano sobre o saldo —, então a
 // apólice chega na produção com prêmio e comissão ZERADOS. Os valores do contrato
-// vêm de uma planilha à parte, uma linha por contrato, vinculada pela APÓLICE.
+// vêm de uma planilha à parte, uma linha por contrato, vinculada pela APÓLICE — ou,
+// para os saúdes ainda sem número de apólice, pelo CPF/CNPJ (ou cliente) + vigência.
 //
-//   prêmio   = PRÊMIO LÍQUIDO × QTD. PARCELAS
+//   prêmio   = PRÊMIO LÍQUIDO, como está: já é o total do contrato (a planilha
+//              calcula valor da PARCELA × QTD. PARCELAS, líquido de IOF)
 //   comissão = TOTAL RECEBIDO (ou AGENCIAMENTO R$ + COMISSÃO R$, se vier vazio)
+//
+// Valor vazio, zero ou negativo na planilha não sobrescreve o da produção.
 //
 // As faturas mensais pagas entram na produção como endosso (EN/ER) com o prêmio e a
 // comissão do mês. Somadas ao valor cheio, duplicariam o contrato — ver
@@ -526,12 +530,12 @@ const SAUDE_COL = {
   seg: ['SEGURADORA'], vig: ['INÍCIO DE VIGÊNCIA', 'VIGÊNCIA', 'INÍCIO VIGÊNCIA'], em: ['DATA EMISSÃO', 'EMISSÃO'],
   fim: ['TÉRMINO DE VIGÊNCIA'], tipo: ['TIPO DE NEGÓCIO', 'TIPO'], colab: ['COLABORADOR'],
   grp: ['GRUPO DE PRODUÇÃO'], sit: ['SITUAÇÃO'],
-  qtdParcelas: ['QTD. PARCELAS', 'QTD PARCELAS', 'QUANTIDADE DE PARCELAS'],
   premioLiq: ['PRÊMIO LÍQUIDO'], agencRS: ['AGENCIAMENTO R$'], comRS: ['COMISSÃO R$'],
   total: ['TOTAL RECEBIDO']
 };
-// Ordem das colunas do modelo baixado pelo painel Fontes. PARCELA, % AGENCIAMENTO e
-// % COMISSÃO são só informativas — o dash não as lê.
+// Ordem das colunas do modelo baixado pelo painel Fontes. PARCELA (valor mensal),
+// QTD. PARCELAS, % AGENCIAMENTO e % COMISSÃO alimentam as fórmulas da própria
+// planilha — o dash não as lê.
 const SAUDE_MODELO = ['APÓLICE', 'CLIENTE', 'CPF/CNPJ', 'SEGURADORA', 'INÍCIO DE VIGÊNCIA', 'DATA EMISSÃO',
   'TIPO DE NEGÓCIO', 'COLABORADOR', 'PARCELA', 'QTD. PARCELAS', '% AGENCIAMENTO', '% COMISSÃO',
   'PRÊMIO LÍQUIDO', 'AGENCIAMENTO R$', 'COMISSÃO R$', 'TOTAL RECEBIDO'];
@@ -567,18 +571,16 @@ function parseSaudeArrayBuffer(buf) {
     const cli = String(get('cli')).trim();
     if (!apolice && !cli) return; // linha em branco
     const linha = i + 2; // +1 do cabeçalho, +1 porque o Excel conta a partir de 1
-    if (!apolice) { avisos.push(`linha ${linha}: sem APÓLICE — ignorada`); return; }
-    const premioLiq = parseNumBR(get('premioLiq'));
-    const qtd = parseNumBR(get('qtdParcelas')) || 1;
     const agencRS = parseNumBR(get('agencRS')), comRS = parseNumBR(get('comRS'));
     const totalTxt = get('total');
+    const premio = Math.max(0, parseNumBR(get('premioLiq')));
+    const com = Math.max(0, totalTxt !== '' ? parseNumBR(totalTxt) : agencRS + comRS);
+    if (!premio && !com) { avisos.push(`linha ${linha} (${cli || apolice}): sem prêmio nem comissão — ignorada`); return; }
     out.push({
       linha, apolice, cli, docDigits: String(get('doc')).replace(/\D/g, ''),
       seg: String(get('seg')).trim(), vig: toDate(get('vig')), em: toDate(get('em')), fim: toDate(get('fim')),
       tipo: String(get('tipo')).trim().toUpperCase(), colab: String(get('colab')).trim(),
-      grp: String(get('grp')).trim(), sit: String(get('sit')).trim(),
-      premio: premioLiq * qtd,
-      com: totalTxt !== '' ? parseNumBR(totalTxt) : agencRS + comRS
+      grp: String(get('grp')).trim(), sit: String(get('sit')).trim(), premio, com
     });
   });
   return { rows: out, avisos };
@@ -601,23 +603,28 @@ const SEM_FILTRO_TIPO = new Set();
 // cache e voltam a ser usados numa recarga): troca por cópias dentro de ALL.
 function applySaudeManual() {
   if (!SAUDE_MANUAL) return;
-  const { rows, avisos } = SAUDE_MANUAL;
-  const porApolice = new Map();
+  const { rows } = SAUDE_MANUAL;
+  const avisos = [...SAUDE_MANUAL.avisos]; // recarga não pode acumular avisos repetidos
+  const add = (map, k, idx) => { if (!k) return; if (!map.has(k)) map.set(k, []); map.get(k).push(idx); };
+  const porApolice = new Map(), porDoc = new Map(), porCli = new Map();
   ALL.forEach((r, idx) => {
-    if (!r.apolice || !isSaude(r)) return;
-    if (!porApolice.has(r.apolice)) porApolice.set(r.apolice, []);
-    porApolice.get(r.apolice).push(idx);
+    if (!isSaude(r)) return;
+    add(porApolice, r.apolice, idx);
+    if (r.tipo !== 'N' && r.tipo !== 'R') return;
+    add(porDoc, r.docDigits, idx);
+    add(porCli, normRamo(r.cli), idx);
   });
   const colabFernando = (ALL.find(r => isSaude(r) && normRamo(r.colab).startsWith('FERNANDO')) || {}).colab
     || SAUDE_COLAB_PADRAO;
+  const DIA = 86400000;
 
   let vinculadas = 0, criadas = 0;
   const usados = new Set();
   rows.forEach(s => {
-    const idxs = porApolice.get(s.apolice) || [];
+    const rotulo = s.apolice ? `apólice ${s.apolice}` : s.cli;
     // Linha cheia: a apólice em si (N/R). Com renovações de mesmo número, a planilha
     // desempata pelo tipo e pelo início de vigência, quando informados.
-    let cands = idxs.filter(i => !usados.has(i) && (ALL[i].tipo === 'N' || ALL[i].tipo === 'R'));
+    let cands = (porApolice.get(s.apolice) || []).filter(i => !usados.has(i) && (ALL[i].tipo === 'N' || ALL[i].tipo === 'R'));
     if (s.tipo) cands = cands.filter(i => ALL[i].tipo === s.tipo).concat(cands.filter(i => ALL[i].tipo !== s.tipo));
     if (s.vig) {
       const vs = fmtD(s.vig), ano = vs.slice(0, 4);
@@ -625,16 +632,28 @@ function applySaudeManual() {
       cands.sort((a, b) => rank(a) - rank(b));
     }
     cands.sort((a, b) => (isApolice(ALL[b]) ? 1 : 0) - (isApolice(ALL[a]) ? 1 : 0));
+    // Sem apólice (ou apólice ainda não cadastrada no ERP): o saúde costuma existir na
+    // produção como linha N sem número. Casa pelo CPF/CNPJ — ou pelo nome do cliente —
+    // com início de vigência a até 31 dias do informado. Sem vigência na planilha, só
+    // vincula se houver um único candidato, para não chutar entre contratos do cliente.
+    if (!cands.length) {
+      const base = (s.docDigits ? porDoc.get(s.docDigits) : porCli.get(normRamo(s.cli))) || [];
+      const livres = base.filter(i => !usados.has(i) && (!s.apolice || !ALL[i].apolice));
+      if (s.vig) {
+        const dist = i => ALL[i].vig ? Math.abs(ALL[i].vig - s.vig) / DIA : Infinity;
+        cands = livres.filter(i => dist(i) <= 31).sort((a, b) => dist(a) - dist(b));
+      } else if (livres.length === 1) cands = livres;
+    }
     let cheia;
     if (cands.length) {
-      const i = cands[0];
+      const i = cands[0], orig = ALL[i];
       usados.add(i);
-      cheia = ALL[i] = { ...ALL[i], premio: s.premio, com: s.com, saudeManual: true,
-        colab: s.colab || ALL[i].colab };
+      cheia = ALL[i] = { ...orig, saudeManual: true, colab: s.colab || orig.colab,
+        premio: s.premio > 0 ? s.premio : orig.premio, com: s.com > 0 ? s.com : orig.com };
       vinculadas++;
     } else {
       const vig = s.vig || s.em;
-      if (!vig) { avisos.push(`linha ${s.linha}: apólice ${s.apolice} não está na produção e não tem INÍCIO DE VIGÊNCIA — ignorada`); return; }
+      if (!vig) { avisos.push(`linha ${s.linha}: ${rotulo} não está na produção e não tem INÍCIO DE VIGÊNCIA — ignorada`); return; }
       const fim = s.fim || (() => { const d = new Date(vig); d.setFullYear(d.getFullYear() + 1); return d; })();
       const docDigits = s.docDigits;
       cheia = {
@@ -649,7 +668,7 @@ function applySaudeManual() {
     }
     // Faturas da mesma apólice dentro da vigência do contrato.
     const ini = fmtD(cheia.vig), fim = cheia.fim ? fmtD(cheia.fim) : '';
-    idxs.forEach(i => {
+    (porApolice.get(cheia.apolice) || []).forEach(i => {
       const r = ALL[i];
       if (r.tipo !== 'EN' && r.tipo !== 'ER') return;
       const d = fmtD(r.vig);
@@ -803,7 +822,7 @@ function openFontesModal() {
     <p class="fontes-hint">A pasta <strong>Dashboard</strong> no SharePoint aceita um arquivo por ano
     (<code>producao_2021.xlsx</code>, <code>producao_2022.xlsx</code>, …). Basta soltar um arquivo novo lá.</p>
     <p class="fontes-hint">Os seguros saúde, cujo prêmio e comissão o ERP não lança, vêm de
-    <code>${SAUDE_FILE}</code> na mesma pasta: uma linha por contrato, vinculada pela apólice.</p>
+    <code>${SAUDE_FILE}</code> na mesma pasta: uma linha por contrato, vinculada pela apólice (ou pelo CPF/CNPJ + vigência, quando ainda não há número).</p>
     <button class="export-modal-option" onclick="baixarModeloSaude()">&#8681; Baixar modelo da planilha de saúde</button>`;
 
   document.getElementById('fontes-modal').style.display = 'flex';

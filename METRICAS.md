@@ -263,20 +263,31 @@ de produção. O modelo com os cabeçalhos pode ser baixado no painel **Fontes**
 
 | Campo no dash | Origem |
 |---|---|
-| prêmio | `PRÊMIO LÍQUIDO × QTD. PARCELAS` |
+| prêmio | `PRÊMIO LÍQUIDO`, como está — já é o total do contrato |
 | comissão | `TOTAL RECEBIDO` (se vazio: `AGENCIAMENTO R$ + COMISSÃO R$`) |
 
-`PARCELA`, `% AGENCIAMENTO` e `% COMISSÃO` são só informativas.
+`PARCELA` (valor mensal), `QTD. PARCELAS`, `% AGENCIAMENTO` e `% COMISSÃO` só alimentam
+as fórmulas da própria planilha; o dash não as lê.
+
+Até 25/09/2026 o dash multiplicava `PRÊMIO LÍQUIDO` por `QTD. PARCELAS`. Como a
+planilha já traz o total ali, o prêmio saía 24 vezes maior: mais de R$ 3 milhões
+desde julho.
+
+Valor vazio, zero ou negativo não sobrescreve o que já veio do ERP. Linha sem prêmio e sem
+comissão é ignorada, com aviso.
 
 ### Vínculo com a produção (`applySaudeManual`)
 
-- **Chave:** `APÓLICE`, entre as linhas de ramo Saúde.
-- **Linha que recebe os valores:** a apólice em si, N ou R, com preferência para
-  `isApolice`. Quando há renovações com o mesmo número, `TIPO DE NEGÓCIO` e
-  `INÍCIO DE VIGÊNCIA` da planilha desempatam.
-- **Apólice que não está na produção:** a linha é criada a partir da planilha. Nesse caso
+- **1ª tentativa, `APÓLICE`:** busca entre as linhas de ramo Saúde. A linha que recebe os
+  valores é a apólice em si, N ou R, com preferência para `isApolice`. Quando há
+  renovações com o mesmo número, `TIPO DE NEGÓCIO` e `INÍCIO DE VIGÊNCIA` desempatam.
+- **2ª tentativa, sem apólice ou com apólice ainda não cadastrada no ERP:** o saúde
+  costuma existir na produção como linha N de ramo Saúde **sem número de apólice e sem
+  data de emissão**. A busca é pelo `CPF/CNPJ` (se vazio, pelo nome do cliente), com
+  início de vigência a até 31 dias do informado. Sem vigência na planilha, só vincula se
+  houver um único candidato.
+- **Nada encontrado:** a linha é criada a partir da planilha. Nesse caso
   `INÍCIO DE VIGÊNCIA` é obrigatório. `COLABORADOR` vazio vira o Fernando.
-- **Linha sem apólice:** ignorada, com aviso no console e no painel Fontes.
 
 ### Faturas mensais × valor cheio
 
