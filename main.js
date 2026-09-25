@@ -502,6 +502,177 @@ function loadProducaoFromSources(sources) {
   })));
   const totalDup = prodSources.reduce((a, s) => a + s.dup, 0);
   if (totalDup) console.warn(`[produção] ${fN(totalDup)} linhas duplicadas descartadas — confira se dois arquivos cobrem o mesmo período.`);
+  applySaudeManual();
+}
+
+// ── Saúdes lançados à parte (saude_fernando.xlsx) ──────────────────────────────
+// O ERP não consegue lançar a remuneração do seguro saúde — agenciamento sobre o
+// prêmio líquido das 3 primeiras parcelas + 2% ao ano sobre o saldo —, então a
+// apólice chega na produção com prêmio e comissão ZERADOS. Os valores do contrato
+// vêm de uma planilha à parte, uma linha por contrato, vinculada pela APÓLICE.
+//
+//   prêmio   = PRÊMIO LÍQUIDO × QTD. PARCELAS
+//   comissão = TOTAL RECEBIDO (ou AGENCIAMENTO R$ + COMISSÃO R$, se vier vazio)
+//
+// As faturas mensais pagas entram na produção como endosso (EN/ER) com o prêmio e a
+// comissão do mês. Somadas ao valor cheio, duplicariam o contrato — ver
+// saudeFaturaConta(). Detalhes em METRICAS.md §8.
+const SAUDE_FILE = 'saude_fernando.xlsx';
+// Usado só quando a apólice não existe na produção e a linha não traz COLABORADOR.
+const SAUDE_COLAB_PADRAO = 'FERNANDO DE PAULA SERAFIM';
+// Cada campo aceita mais de uma grafia de cabeçalho (comparadas por normRamo).
+const SAUDE_COL = {
+  apolice: ['APÓLICE', 'APOLICE', 'Nº APÓLICE'], cli: ['CLIENTE'], doc: ['CPF/CNPJ', 'CPF', 'CNPJ'],
+  seg: ['SEGURADORA'], vig: ['INÍCIO DE VIGÊNCIA', 'VIGÊNCIA', 'INÍCIO VIGÊNCIA'], em: ['DATA EMISSÃO', 'EMISSÃO'],
+  fim: ['TÉRMINO DE VIGÊNCIA'], tipo: ['TIPO DE NEGÓCIO', 'TIPO'], colab: ['COLABORADOR'],
+  grp: ['GRUPO DE PRODUÇÃO'], sit: ['SITUAÇÃO'],
+  qtdParcelas: ['QTD. PARCELAS', 'QTD PARCELAS', 'QUANTIDADE DE PARCELAS'],
+  premioLiq: ['PRÊMIO LÍQUIDO'], agencRS: ['AGENCIAMENTO R$'], comRS: ['COMISSÃO R$'],
+  total: ['TOTAL RECEBIDO']
+};
+// Ordem das colunas do modelo baixado pelo painel Fontes. PARCELA, % AGENCIAMENTO e
+// % COMISSÃO são só informativas — o dash não as lê.
+const SAUDE_MODELO = ['APÓLICE', 'CLIENTE', 'CPF/CNPJ', 'SEGURADORA', 'INÍCIO DE VIGÊNCIA', 'DATA EMISSÃO',
+  'TIPO DE NEGÓCIO', 'COLABORADOR', 'PARCELA', 'QTD. PARCELAS', '% AGENCIAMENTO', '% COMISSÃO',
+  'PRÊMIO LÍQUIDO', 'AGENCIAMENTO R$', 'COMISSÃO R$', 'TOTAL RECEBIDO'];
+
+// Linhas normalizadas da planilha de saúde (parseSaudeArrayBuffer), ou null se o
+// arquivo não existe. Fica em memória para o upload manual de produção também mesclar.
+let SAUDE_MANUAL = null;
+
+// Número que pode vir digitado como texto: 'R$ 1.234,56', '1234.56', '2%'.
+function parseNumBR(v) {
+  if (typeof v === 'number') return v;
+  let s = String(v || '').replace(/[R$\s%]/g, '');
+  if (!s) return 0;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+}
+
+function parseSaudeArrayBuffer(buf) {
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+  const out = [], avisos = [];
+  rows.forEach((raw, i) => {
+    const byKey = {};
+    Object.keys(raw).forEach(k => { byKey[normRamo(k)] = raw[k]; });
+    const get = campo => {
+      for (const alias of SAUDE_COL[campo]) {
+        const v = byKey[normRamo(alias)];
+        if (v !== undefined && v !== '') return v;
+      }
+      return '';
+    };
+    const apolice = String(get('apolice')).trim();
+    const cli = String(get('cli')).trim();
+    if (!apolice && !cli) return; // linha em branco
+    const linha = i + 2; // +1 do cabeçalho, +1 porque o Excel conta a partir de 1
+    if (!apolice) { avisos.push(`linha ${linha}: sem APÓLICE — ignorada`); return; }
+    const premioLiq = parseNumBR(get('premioLiq'));
+    const qtd = parseNumBR(get('qtdParcelas')) || 1;
+    const agencRS = parseNumBR(get('agencRS')), comRS = parseNumBR(get('comRS'));
+    const totalTxt = get('total');
+    out.push({
+      linha, apolice, cli, docDigits: String(get('doc')).replace(/\D/g, ''),
+      seg: String(get('seg')).trim(), vig: toDate(get('vig')), em: toDate(get('em')), fim: toDate(get('fim')),
+      tipo: String(get('tipo')).trim().toUpperCase(), colab: String(get('colab')).trim(),
+      grp: String(get('grp')).trim(), sit: String(get('sit')).trim(),
+      premio: premioLiq * qtd,
+      com: totalTxt !== '' ? parseNumBR(totalTxt) : agencRS + comRS
+    });
+  });
+  return { rows: out, avisos };
+}
+
+const isSaude = r => normRamo(r.ramo).includes('SAUDE');
+
+// Uma fatura de saúde (endosso) só soma quando o tipo da linha com o valor cheio
+// está FORA dos tipos considerados — ou seja, quando o filtro de tipo deixa passar
+// só os endossos. Sem filtro de tipo, ou com N/R marcado, vale o valor cheio.
+//   tipos: o Set de tipos marcados (vazio = todos).
+function saudeFaturaConta(r, tipos) {
+  if (!r.saudeFaturaDe) return true;
+  return tipos.size > 0 && !tipos.has(r.saudeFaturaDe);
+}
+// Para quem lê ALL sem filtro de tipo (gráfico por períodos, LTV do cross-sell).
+const SEM_FILTRO_TIPO = new Set();
+
+// Mescla SAUDE_MANUAL em ALL. Não altera os objetos originais (que podem ter vindo do
+// cache e voltam a ser usados numa recarga): troca por cópias dentro de ALL.
+function applySaudeManual() {
+  if (!SAUDE_MANUAL) return;
+  const { rows, avisos } = SAUDE_MANUAL;
+  const porApolice = new Map();
+  ALL.forEach((r, idx) => {
+    if (!r.apolice || !isSaude(r)) return;
+    if (!porApolice.has(r.apolice)) porApolice.set(r.apolice, []);
+    porApolice.get(r.apolice).push(idx);
+  });
+  const colabFernando = (ALL.find(r => isSaude(r) && normRamo(r.colab).startsWith('FERNANDO')) || {}).colab
+    || SAUDE_COLAB_PADRAO;
+
+  let vinculadas = 0, criadas = 0;
+  const usados = new Set();
+  rows.forEach(s => {
+    const idxs = porApolice.get(s.apolice) || [];
+    // Linha cheia: a apólice em si (N/R). Com renovações de mesmo número, a planilha
+    // desempata pelo tipo e pelo início de vigência, quando informados.
+    let cands = idxs.filter(i => !usados.has(i) && (ALL[i].tipo === 'N' || ALL[i].tipo === 'R'));
+    if (s.tipo) cands = cands.filter(i => ALL[i].tipo === s.tipo).concat(cands.filter(i => ALL[i].tipo !== s.tipo));
+    if (s.vig) {
+      const vs = fmtD(s.vig), ano = vs.slice(0, 4);
+      const rank = i => fmtD(ALL[i].vig) === vs ? 0 : fmtD(ALL[i].vig).slice(0, 4) === ano ? 1 : 2;
+      cands.sort((a, b) => rank(a) - rank(b));
+    }
+    cands.sort((a, b) => (isApolice(ALL[b]) ? 1 : 0) - (isApolice(ALL[a]) ? 1 : 0));
+    let cheia;
+    if (cands.length) {
+      const i = cands[0];
+      usados.add(i);
+      cheia = ALL[i] = { ...ALL[i], premio: s.premio, com: s.com, saudeManual: true,
+        colab: s.colab || ALL[i].colab };
+      vinculadas++;
+    } else {
+      const vig = s.vig || s.em;
+      if (!vig) { avisos.push(`linha ${s.linha}: apólice ${s.apolice} não está na produção e não tem INÍCIO DE VIGÊNCIA — ignorada`); return; }
+      const fim = s.fim || (() => { const d = new Date(vig); d.setFullYear(d.getFullYear() + 1); return d; })();
+      const docDigits = s.docDigits;
+      cheia = {
+        tipo: s.tipo === 'R' ? 'R' : 'N', vig, em: s.em || vig, fim, cli: s.cli, seg: s.seg,
+        ramo: 'Saúde', grp: s.grp, premio: s.premio, com: s.com, colab: s.colab || colabFernando,
+        sit: s.sit || (fim >= today() ? SIT.ATIVA : SIT.VENCIDA), motivo: '', cancel: null, docDigits,
+        tipoPessoa: docDigits.length === 11 ? 'PF' : docDigits.length > 11 ? 'PJ' : '',
+        tipoDoc: 'APÓLICE', campanha: '', apolice: s.apolice, endosso: '', saudeManual: true
+      };
+      ALL.push(cheia);
+      criadas++;
+    }
+    // Faturas da mesma apólice dentro da vigência do contrato.
+    const ini = fmtD(cheia.vig), fim = cheia.fim ? fmtD(cheia.fim) : '';
+    idxs.forEach(i => {
+      const r = ALL[i];
+      if (r.tipo !== 'EN' && r.tipo !== 'ER') return;
+      const d = fmtD(r.vig);
+      if (ini && d && d < ini) return;
+      if (fim && d && d >= fim) return;
+      ALL[i] = { ...r, saudeFaturaDe: cheia.tipo };
+    });
+  });
+
+  prodSources.push({
+    name: SAUDE_FILE, total: rows.length, dup: 0, anos: prodYearRange(rows),
+    lastModified: SAUDE_MANUAL.lastModified || null, cached: false,
+    saude: { vinculadas, criadas, avisos }
+  });
+  console.info(`[saúde] ${SAUDE_FILE}: ${vinculadas} vinculadas à produção, ${criadas} criadas.`);
+  if (avisos.length) console.warn('[saúde] ' + avisos.join(' · '));
+}
+
+function baixarModeloSaude() {
+  const ws = XLSX.utils.aoa_to_sheet([SAUDE_MODELO]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Saúde');
+  XLSX.writeFile(wb, SAUDE_FILE);
 }
 
 // ── Formatação de documento (CPF/CNPJ) ─────────────────────────────────────────
@@ -610,8 +781,11 @@ function openFontesModal() {
   const linhas = prodSources.map(s => {
     const anos = s.anos ? (s.anos.min === s.anos.max ? String(s.anos.min) : `${s.anos.min}–${s.anos.max}`) : '—';
     const quando = s.lastModified ? new Date(s.lastModified).toLocaleDateString('pt-BR') : '—';
+    const saude = s.saude
+      ? `<br><small>${fN(s.saude.vinculadas)} vinculadas à produção · ${fN(s.saude.criadas)} criadas${s.saude.avisos.length ? ` · ${fN(s.saude.avisos.length)} aviso(s) no console` : ''}</small>`
+      : '';
     return `<tr>
-      <td>${escHtml(s.name)}${s.cached ? ' <span class="fontes-tag">cache</span>' : ''}</td>
+      <td>${escHtml(s.name)}${s.cached ? ' <span class="fontes-tag">cache</span>' : ''}${saude}</td>
       <td class="num">${fN(s.total)}</td>
       <td>${anos}</td>
       <td>${quando}</td>
@@ -627,7 +801,10 @@ function openFontesModal() {
     </table>
     ${totalDup ? '<p class="fontes-warn">Há linhas repetidas entre arquivos — elas foram descartadas, mas confira se dois arquivos cobrem o mesmo período.</p>' : ''}
     <p class="fontes-hint">A pasta <strong>Dashboard</strong> no SharePoint aceita um arquivo por ano
-    (<code>producao_2021.xlsx</code>, <code>producao_2022.xlsx</code>, …). Basta soltar um arquivo novo lá.</p>`;
+    (<code>producao_2021.xlsx</code>, <code>producao_2022.xlsx</code>, …). Basta soltar um arquivo novo lá.</p>
+    <p class="fontes-hint">Os seguros saúde, cujo prêmio e comissão o ERP não lança, vêm de
+    <code>${SAUDE_FILE}</code> na mesma pasta: uma linha por contrato, vinculada pela apólice.</p>
+    <button class="export-modal-option" onclick="baixarModeloSaude()">&#8681; Baixar modelo da planilha de saúde</button>`;
 
   document.getElementById('fontes-modal').style.display = 'flex';
   document.addEventListener('keydown', fontesEscHandler);
@@ -696,6 +873,14 @@ function initDashboard(opts) {
 
 function applySharePointData(payloads, warnings) {
   try {
+    // Planilha de saúde com problema não pode derrubar a produção inteira.
+    if (payloads.saude) {
+      try {
+        SAUDE_MANUAL = { ...parseSaudeArrayBuffer(payloads.saude.buf), lastModified: payloads.saude.lastModified };
+      } catch (e) {
+        console.error(`[saúde] ${SAUDE_FILE} não pôde ser lida:`, e);
+      }
+    }
     if (payloads.producao && payloads.producao.length) loadProducaoFromSources(payloads.producao);
     loadClaimsFromBuffers({
       sinistrosAvisados: payloads.sinistrosAvisados || null,
@@ -953,7 +1138,7 @@ async function _spFetchAndLoad(token, mode) {
 
     const prodFiles = mode === 'prod' ? await _spListProducaoFiles(token, driveId) : [];
     const sinKeys   = ['sinistrosAvisados', 'sinistrosPagamentos'];
-    const totalFiles = prodFiles.length + sinKeys.length;
+    const totalFiles = prodFiles.length + sinKeys.length + (mode === 'prod' ? 1 : 0);
     let done = 0;
     const bump = label => setProgress(20 + Math.round(done / totalFiles * 65), label);
 
@@ -990,8 +1175,23 @@ async function _spFetchAndLoad(token, mode) {
       else if (resp.status !== 404) warnings.push(`${key}: HTTP ${resp.status}`);
     });
 
+    // Saúdes lançados à parte (ver applySaudeManual). Arquivo pequeno e opcional:
+    // sem cache, e a ausência (404) não é erro.
+    const saudeTask = mode !== 'prod' ? null : (async () => {
+      try {
+        const url  = `${_GRAPH}/drives/${driveId}/root:/${_SP_FOLDER}/${SAUDE_FILE}:/content`;
+        const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (resp.ok) payloads.saude = { buf: await resp.arrayBuffer(), lastModified: resp.headers.get('Last-Modified') };
+        else if (resp.status !== 404) warnings.push(`${SAUDE_FILE}: HTTP ${resp.status}`);
+      } catch (e) {
+        warnings.push(`${SAUDE_FILE}: ${e.message}`);
+      }
+      done++; bump(`Baixando ${SAUDE_FILE}...`);
+    })();
+
     const prodSrc = (await Promise.all(prodTasks)).filter(Boolean);
     await Promise.all(sinTasks);
+    await saudeTask;
     if (mode === 'prod') payloads.producao = prodSrc;
 
     // Em modo produção, não adianta seguir com os sinistros: o usuário pediu produção.
@@ -1131,6 +1331,7 @@ function applyFilters() {
     if (MS.ram.size > 0 && !MS.ram.has(r.ramo)) return false;
     if (MS.seg.size > 0 && !MS.seg.has(r.seg)) return false;
     if (activeTipos.size > 0 && !activeTipos.has(r.tipo)) return false;
+    if (!saudeFaturaConta(r, activeTipos)) return false;
     return true;
   });
   recomputeFdClaims();
@@ -1184,6 +1385,7 @@ function getRetData() {
     if (RET_MS.grp.size > 0 && !RET_MS.grp.has(r.grp)) return false;
     if (RET_MS.mot.size > 0 && (r.sit === 'Cancelada' || r.tipo === 'CN' || r.tipo === 'CR') && !RET_MS.mot.has(r.motivo || 'Não informado')) return false;
     if (retActiveTipos.size > 0 && !retActiveTipos.has(r.tipo)) return false;
+    if (!saudeFaturaConta(r, retActiveTipos)) return false;
     return true;
   });
 }
@@ -1368,7 +1570,7 @@ function renderProdChart() {
     datasets = [{ label: String(curYear), data: months.map(m => cur[m] || 0), borderColor: '#639922', backgroundColor: 'rgba(99,153,34,0.07)', fill: true, tension: .35, pointRadius: 3, borderWidth: 2.5 }, { label: String(prevYear), data: months.map(m => prev[m] || 0), borderColor: '#E24B4A', backgroundColor: 'rgba(226,75,74,0.04)', fill: true, tension: .35, pointRadius: 3, borderWidth: 2, borderDash: [6, 3] }];
     legendHtml = `<span><span class="leg-dot" style="background:#639922;display:inline-block"></span>${curYear} — atual</span><span><span class="leg-dot" style="background:#E24B4A;display:inline-block"></span>${prevYear} — anterior</span><span style="font-size:10px;opacity:.5">· Adicione períodos para comparar janelas específicas</span>`;
   } else {
-    datasets = periods.map(p => { const byMonth = {}; ALL.filter(r => r.vig && fmtD(r.vig) >= p.start && fmtD(r.vig) <= p.end).forEach(r => { const dt = toDate(r.vig); if (!dt) return; const m = String(dt.getMonth() + 1).padStart(2, '0'); byMonth[m] = (byMonth[m] || 0) + r[field]; }); return { label: p.label, data: months.map(m => byMonth[m] || 0), borderColor: p.color, backgroundColor: p.color + '15', fill: false, tension: .35, pointRadius: 3, borderWidth: 2.5 }; });
+    datasets = periods.map(p => { const byMonth = {}; ALL.filter(r => r.vig && fmtD(r.vig) >= p.start && fmtD(r.vig) <= p.end && saudeFaturaConta(r, SEM_FILTRO_TIPO)).forEach(r => { const dt = toDate(r.vig); if (!dt) return; const m = String(dt.getMonth() + 1).padStart(2, '0'); byMonth[m] = (byMonth[m] || 0) + r[field]; }); return { label: p.label, data: months.map(m => byMonth[m] || 0), borderColor: p.color, backgroundColor: p.color + '15', fill: false, tension: .35, pointRadius: 3, borderWidth: 2.5 }; });
     legendHtml = periods.map(p => `<span><span class="leg-dot" style="background:${p.color};display:inline-block"></span>${p.label}</span>`).join('');
   }
   document.getElementById('period-legend').innerHTML = legendHtml;
@@ -1940,7 +2142,7 @@ function buildCrossMap(pessoa) {
       map.set(r.docDigits, c);
     }
     if (r.cli) c.nome = r.cli;
-    c.comissaoTotal += r.com;
+    if (saudeFaturaConta(r, SEM_FILTRO_TIPO)) c.comissaoTotal += r.com;
     if (r.colab) c.colabs.add(r.colab);
     if (r.sit === 'Ativa') {
       if (r.tipoDoc === 'APÓLICE') c.apolicesAtivas++; // exclui endossos/faturas, que são alterações da apólice, não novos contratos
@@ -2606,6 +2808,7 @@ function matchesCompScope(r, emStart, emEnd) {
   if (MS.ram.size > 0 && !MS.ram.has(r.ramo)) return false;
   if (MS.seg.size > 0 && !MS.seg.has(r.seg)) return false;
   if (activeTipos.size > 0 && !activeTipos.has(r.tipo)) return false;
+  if (!saudeFaturaConta(r, activeTipos)) return false;
   return true;
 }
 
@@ -3326,6 +3529,7 @@ function filterMetasData(opts) {
   return ALL.filter(r => {
     if (!metaTipoSide(r.tipo)) return false; // só N, R, EN, ER entram na meta
     if (activeTipos.size && !activeTipos.has(r.tipo)) return false;
+    if (!saudeFaturaConta(r, activeTipos)) return false;
     // comparação por string YYYY-MM-DD, idêntica à aba Produção (evita erro de fuso horário)
     const ds = fmtD(r.vig);
     if (!ds) return false;
@@ -3392,6 +3596,7 @@ function getMetasRealizadoData() {
   return ALL.filter(r => {
     if (!metaTipoSide(r.tipo)) return false;
     if (activeTipos.size && !activeTipos.has(r.tipo)) return false;
+    if (!saudeFaturaConta(r, activeTipos)) return false;
     const ds = fmtD(r.vig);
     if (!ds) return false;
     if (vs && ds < vs) return false;

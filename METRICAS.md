@@ -249,6 +249,63 @@ apólices ativas (`buildCrossMap`), sem filtro de duração nem de ramo, e segue
 
 ---
 
+## 8. Seguros saúde — planilha `saude_fernando.xlsx`
+
+O ERP não consegue lançar a remuneração do saúde: **agenciamento** (antecipação sobre o
+prêmio líquido das 3 primeiras parcelas) e depois **2% ao ano** sobre o saldo. Por isso a
+apólice chega na produção com prêmio e comissão **zerados** e não somava em meta nenhuma.
+
+Os valores do contrato vêm de `saude_fernando.xlsx`, na mesma pasta Dashboard do
+SharePoint. O nome não começa com `producao`, então o arquivo não é lido como planilha
+de produção. O modelo com os cabeçalhos pode ser baixado no painel **Fontes**.
+
+É uma linha por contrato:
+
+| Campo no dash | Origem |
+|---|---|
+| prêmio | `PRÊMIO LÍQUIDO × QTD. PARCELAS` |
+| comissão | `TOTAL RECEBIDO` (se vazio: `AGENCIAMENTO R$ + COMISSÃO R$`) |
+
+`PARCELA`, `% AGENCIAMENTO` e `% COMISSÃO` são só informativas.
+
+### Vínculo com a produção (`applySaudeManual`)
+
+- **Chave:** `APÓLICE`, entre as linhas de ramo Saúde.
+- **Linha que recebe os valores:** a apólice em si, N ou R, com preferência para
+  `isApolice`. Quando há renovações com o mesmo número, `TIPO DE NEGÓCIO` e
+  `INÍCIO DE VIGÊNCIA` da planilha desempatam.
+- **Apólice que não está na produção:** a linha é criada a partir da planilha. Nesse caso
+  `INÍCIO DE VIGÊNCIA` é obrigatório. `COLABORADOR` vazio vira o Fernando.
+- **Linha sem apólice:** ignorada, com aviso no console e no painel Fontes.
+
+### Faturas mensais × valor cheio
+
+Cada fatura paga entra na produção como **endosso (EN/ER)**, com o prêmio e a comissão
+do mês. O valor cheio fica na linha N/R. Somar os dois duplicaria o contrato. Por isso
+as faturas da apólice, dentro da vigência do contrato, são marcadas (`saudeFaturaDe`), e
+`saudeFaturaConta()` só as deixa somar quando o filtro de tipo exclui a linha cheia:
+
+| Filtro de tipo | Soma |
+|---|---|
+| nenhum | valor cheio |
+| N ou R (com ou sem EN/ER) | valor cheio |
+| só EN/ER | faturas do mês |
+
+A regra vale em:
+- `applyFilters` (Visão Geral e Produção);
+- `matchesCompScope` (Comparativo);
+- `getRetData`, com os botões de tipo da própria aba (Retenção);
+- `filterMetasData` e `getMetasRealizadoData` (Metas);
+- o gráfico por períodos e o LTV do Cross-sell (sem filtro, ou seja, valor cheio).
+
+A meta de novos da Exibição TV usa só `tipo === 'N'`, então nunca vê as faturas.
+
+**Consequência:** o contrato inteiro conta no mês do início de vigência, como qualquer
+apólice. Um recorte de vigência que pegue só meses posteriores mostra zero para esse
+contrato, e não as faturas daqueles meses.
+
+---
+
 ## 7. Pendências e decisões em aberto
 
 - **Análise de coortes** (`renderCohorts`) segue na regra antiga: rastreia queda mês

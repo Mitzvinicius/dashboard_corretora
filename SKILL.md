@@ -71,7 +71,7 @@ chooseProd() / chooseSin()
 | SharePoint hostname | `santolinseguros.sharepoint.com` |
 | Biblioteca | `Santolin` |
 | Pasta | `Dashboard` |
-| Arquivos esperados | `producao_<ano>.xlsx` (um por ano, ex.: `producao_2021.xlsx` … `producao_2026.xlsx`), `sinistrosAvisados.xlsx`, `sinistrosPagamentos.xlsx` |
+| Arquivos esperados | `producao_<ano>.xlsx` (um por ano, ex.: `producao_2021.xlsx` … `producao_2026.xlsx`), `sinistrosAvisados.xlsx`, `sinistrosPagamentos.xlsx`, `saude_fernando.xlsx` (opcional) |
 | Tenant ID | `59190e65-5cad-4885-9f2d-77a59385667b` |
 | **App ID — browser (SPA / MSAL)** | `18d14ac5-16fc-46f4-8ffa-95f880138247` |
 | App ID — sync (Python, client credentials) | `b5812845-04d8-4b4a-b754-bdd435ab09b9` |
@@ -120,6 +120,14 @@ Regras que sustentam isso:
 - **A produção não passa mais pelo sync automático** (`scripts/sync_producao.py`), justamente
   para o script não sobrescrever um `producao.xlsx` que concorreria com os arquivos por ano.
   Sinistros continuam automáticos.
+
+### Seguros saúde (`saude_fernando.xlsx`)
+
+O ERP lança os saúdes com prêmio e comissão zerados. Os valores reais vão numa planilha
+à parte, na mesma pasta: uma linha por contrato, vinculada pela `APÓLICE`. O modelo com
+os cabeçalhos é baixado no painel de fontes (**"Baixar modelo da planilha de saúde"**).
+O arquivo é opcional; se não existir, o dashboard carrega normalmente. As regras de
+cálculo e a forma de evitar duplicação com as faturas mensais estão em `METRICAS.md` §8.
 
 ---
 
