@@ -28,9 +28,10 @@ const PERIOD_COLORS = ['#378ADD', '#639922', '#E24B4A', '#BA7517', '#534AB7', '#
 // Retenção state
 const RET_MS = { col: new Set(), ram: new Set(), grp: new Set(), mot: new Set() };
 let retActiveTipos = new Set();
+let retSoEvitavel = true; // filtro rápido 'Só evitável' da aba Retenção
 let retDetailFilter = '';
 let retSortKey = 'pctQtd', retSortDir = 'desc';
-const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-cohort': true, 'ret-risco': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'comp-pivot': true, 'comp-rank': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
+const sectionState = { kpis: true, chart: true, table: true, 'ret-kpis': true, 'ret-charts': true, 'ret-prod': true, 'ret-detail': true, 'cross-campanha': true, 'cross-table': true, 'comp-chart': true, 'comp-kpis': true, 'comp-pivot': true, 'comp-rank': true, 'sin-kpis': true, 'sin-charts': true, 'sin-sinistralidade': true, 'sin-rentabilidade': true, 'metas-semanal': true, 'metas-colab': true };
 let metaSortKey = 'totalAnt', metaSortDir = 'desc';
 let metaWeekTeam = 'geral';    // geral | pessoais | patrimoniais
 let metaWeekMetric = 'premio'; // premio | comissao
@@ -156,6 +157,10 @@ const SIT = {
 // É a base da taxa de renovação — Cancelada/Suspensa/Perda Total saíram por evento
 // alheio à renovação (no meio da vigência), então não eram candidatas.
 const SIT_DESFECHO_RENOVACAO = [SIT.RENOVADA, SIT.VENCIDA];
+// A planilha não é consistente na caixa ('Perda total' x 'Perda Total'): devolve a
+// grafia de SIT quando bate sem diferenciar maiúsculas; senão preserva o texto.
+const SIT_CANON = new Map(Object.values(SIT).map(s => [s.toUpperCase(), s]));
+const normSit = s => SIT_CANON.get(String(s || '').trim().toUpperCase()) || String(s || '').trim();
 
 // Uma linha é a apólice em si (não endosso/fatura) quando não traz número de endosso.
 // Cruzamos com TIPO DOCUMENTO porque as duas fontes divergem em registros legados.
@@ -299,8 +304,6 @@ function toggleSection(key) {
     if (hdr) hdr.classList.add('open');
     if (key === 'chart') renderProdChart();
     if (key === 'ret-charts') renderRetCharts();
-    if (key === 'ret-cohort') renderCohorts();
-    if (key === 'ret-risco') renderRiskWarning();
     if (key === 'comp-chart' || key === 'comp-kpis') renderCompTab();
     if (key === 'comp-rank') renderCompRankTable();
     if (['sin-kpis', 'sin-charts', 'sin-sinistralidade', 'sin-rentabilidade'].includes(key)) renderSinistrosTab();
@@ -436,7 +439,7 @@ function parseProducaoArrayBuffer(buf) {
       fim: toDate(r[COL.fim]), cli: String(r[COL.cli] || ''), seg: String(r[COL.seg] || ''),
       ramo: canonRamo(r[COL.ramo]), grp: String(r[COL.grp] || ''),
       premio: parseFloat(r[COL.premio]) || 0, com: parseFloat(r[COL.com]) || 0,
-      colab: String(r[COL.colab] || ''), sit: String(r[COL.sit] || ''),
+      colab: String(r[COL.colab] || ''), sit: normSit(r[COL.sit]),
       motivo: String(r[COL.motivo] || ''), cancel: toDate(r[COL.cancel]),
       docDigits, tipoPessoa, tipoDoc: String(r[COL.tipoDoc] || '').trim(),
       campanha: String(r[COL.campanha] || '').trim(),
@@ -495,6 +498,8 @@ function loadProducaoFromSources(sources) {
     });
   }
   ALL = merged;
+  applyMotivoEndosso();
+  applyTrocaSeguradora();
   console.table(prodSources.map(s => ({
     arquivo: s.name, linhas: s.total, duplicadas: s.dup,
     anos: s.anos ? (s.anos.min === s.anos.max ? String(s.anos.min) : `${s.anos.min}–${s.anos.max}`) : '—',
@@ -503,6 +508,65 @@ function loadProducaoFromSources(sources) {
   const totalDup = prodSources.reduce((a, s) => a + s.dup, 0);
   if (totalDup) console.warn(`[produção] ${fN(totalDup)} linhas duplicadas descartadas — confira se dois arquivos cobrem o mesmo período.`);
   applySaudeManual();
+}
+
+// ── Motivo de cancelamento vindo do endosso ───────────────────────────────────
+// O Quiver costuma registrar o motivo no endosso de cancelamento (CN/CR), e não na
+// linha da apólice. Regra de negócio: o motivo do endosso vale primeiro, o da própria
+// apólice só quando nenhum endosso traz motivo. Com mais de um endosso com motivo,
+// fica o mais recente (data de cancelamento, ou início do endosso).
+// O vínculo é seguradora + número da apólice — o endosso repete o número da mãe.
+// Roda também sobre linhas vindas do cache, que podem ter sido parseadas antes desta
+// regra existir; por isso normaliza a situação aqui também. O resultado é o mesmo a
+// cada recarga (o endosso não muda), então alterar a linha no lugar é seguro.
+const chaveApolice = r => r.seg + '|' + r.apolice;
+function applyMotivoEndosso() {
+  const doEndosso = new Map();
+  ALL.forEach(r => {
+    r.sit = normSit(r.sit);
+    if ((r.tipo !== 'CN' && r.tipo !== 'CR') || !r.apolice || !r.motivo.trim()) return;
+    const k = chaveApolice(r), d = fmtD(r.cancel || r.vig), atual = doEndosso.get(k);
+    if (!atual || d > atual.d) doEndosso.set(k, { motivo: r.motivo.trim(), d });
+  });
+  ALL.forEach(r => {
+    if (!isApolice(r)) return;
+    const e = doEndosso.get(chaveApolice(r));
+    if (e) r.motivo = e.motivo;
+  });
+}
+
+// ── Cancelamento que foi troca de seguradora ─────────────────────────────────
+// É prática da corretora cancelar a apólice e reemitir o cliente em outra cia — muitas
+// vezes como R, para aproveitar o bônus de renovação. O motivo quase nunca registra
+// isso, então a regra olha o SALDO de apólices do cliente naquele ramo:
+//   antes  = a apólice cancelada + as outras do cliente (CPF/CNPJ + ramo) em vigor
+//            15 dias antes do cancelamento (a nova costuma nascer uns dias antes de o
+//            cancelamento ser lançado) — ou no início da cancelada, se for mais tarde
+//   depois = as do cliente em vigor 90 dias depois do cancelamento (ou hoje, se os
+//            90 dias ainda não passaram — até lá a troca pode não ter acontecido)
+// depois >= antes → o cliente não diminuiu: foi troca (ou bônus aproveitado em mais
+// de um item), não churn. Marca r.trocaSeg na apólice e nos endossos CN/CR dela.
+const TROCA_DIAS_ANTES = 15, TROCA_DIAS_DEPOIS = 90;
+function applyTrocaSeguradora() {
+  const porCliente = new Map();
+  ALL.forEach(r => {
+    r.trocaSeg = false;
+    if (!isApolice(r) || (r.tipo !== 'N' && r.tipo !== 'R') || !r.docDigits || !r.vig) return;
+    const k = r.docDigits + '|' + normRamo(r.ramo);
+    if (!porCliente.has(k)) porCliente.set(k, []);
+    porCliente.get(k).push(r);
+  });
+  const emVigor = (lista, t, exceto) => lista.filter(x => x !== exceto && fmtD(x.vig) <= t && churnSaida(x) > t).length;
+  const hoje = fmtD(today()), trocas = new Set();
+  porCliente.forEach(lista => lista.forEach(r => {
+    if (r.sit !== SIT.CANCELADA) return;
+    const saida = toDate(churnSaida(r));
+    if (!saida) return;
+    const t0 = [fmtD(addDays(saida, -TROCA_DIAS_ANTES)), fmtD(r.vig)].sort()[1];
+    const t1 = [fmtD(addDays(saida, TROCA_DIAS_DEPOIS)), hoje].sort()[0];
+    if (emVigor(lista, t1) >= 1 + emVigor(lista, t0, r)) { r.trocaSeg = true; trocas.add(chaveApolice(r)); }
+  }));
+  ALL.forEach(r => { if ((r.tipo === 'CN' || r.tipo === 'CR') && trocas.has(chaveApolice(r))) r.trocaSeg = true; });
 }
 
 // ── Saúdes lançados à parte (saude_fernando.xlsx) ──────────────────────────────
@@ -580,7 +644,7 @@ function parseSaudeArrayBuffer(buf) {
       linha, apolice, cli, docDigits: String(get('doc')).replace(/\D/g, ''),
       seg: String(get('seg')).trim(), vig: toDate(get('vig')), em: toDate(get('em')), fim: toDate(get('fim')),
       tipo: String(get('tipo')).trim().toUpperCase(), colab: String(get('colab')).trim(),
-      grp: String(get('grp')).trim(), sit: String(get('sit')).trim(), premio, com
+      grp: String(get('grp')).trim(), sit: normSit(get('sit')), premio, com
     });
   });
   return { rows: out, avisos };
@@ -854,6 +918,7 @@ function initDashboard(opts) {
       activeCancelMotivos = null;
       periods = [];
       CROSS.pessoa = 'PF'; CROSS.col.clear(); CROSS.ram.clear(); crossSearch = '';
+      setRetPeriodoPadrao();
     }
     populateFilters();
     buildTipoBtns();
@@ -1305,17 +1370,42 @@ function initDash(fname) { initDashboard({ preferredTab: 'visao-geral' }); }
 // ── Global filters ─────────────────────────────────────────────────────────────
 function populateFilters() {
   const uniq = field => [...new Set(ALL.map(r => r[field]).filter(Boolean))].sort();
-  buildMultiSelect('ms-col', MS, 'col', uniq('colab'), 'Todos');
+  buildColabOptions();
   buildMultiSelect('ms-grp', MS, 'grp', uniq('grp'), 'Todos');
   buildMultiSelect('ms-ram', MS, 'ram', uniq('ramo'), 'Todos');
   buildMultiSelect('ms-seg', MS, 'seg', uniq('seg'), 'Todas');
-  buildMultiSelect('ms-ret-col', RET_MS, 'col', uniq('colab'), 'Todos');
-  buildMultiSelect('ms-ret-ram', RET_MS, 'ram', uniq('ramo'), 'Todos');
+  buildRetColabOptions();
+  buildMultiSelect('ms-ret-ram', RET_MS, 'ram', uniq('ramo').filter(r => classifyRamo(r) !== 'excluded'), 'Todos');
   buildMultiSelect('ms-ret-grp', RET_MS, 'grp', uniq('grp'), 'Todos');
   buildMultiSelect('ms-ret-mot', RET_MS, 'mot', [...new Set(ALL.filter(r => r.sit === 'Cancelada').map(r => r.motivo || 'Não informado').filter(Boolean))].sort(), 'Todos');
   buildCrossFilters();
-  ['f-vig-s', 'f-vig-e', 'f-em-s', 'f-em-e'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
-  ['ret-vig-s', 'ret-vig-e', 'ret-can-s', 'ret-can-e'].forEach(id => document.getElementById(id).addEventListener('change', renderRetTab));
+  ['f-vig-s', 'f-vig-e', 'f-em-s', 'f-em-e'].forEach(id => document.getElementById(id).addEventListener('change', () => { buildColabOptions(); applyFilters(); }));
+  ['ret-per-s', 'ret-per-e'].forEach(id => document.getElementById(id).addEventListener('change', () => { buildRetColabOptions(); renderRetTab(); }));
+}
+// ── Colaboradores com produção no período ──────────────────────────────────────
+// O seletor de colaborador só oferece quem tem produção (N, R, EN, ER) dentro das
+// datas do filtro — sem datas, quem tem produção em qualquer período. Quem já está
+// marcado continua na lista mesmo sem produção, para o filtro nunca ficar ativo
+// escondido. Remontado só quando as datas mudam (não a cada clique no seletor).
+const TIPOS_PRODUCAO = ['N', 'R', 'EN', 'ER'];
+function colabsComProducao(dentro, marcados) {
+  const set = new Set(marcados);
+  ALL.forEach(r => { if (r.colab && TIPOS_PRODUCAO.includes(r.tipo) && dentro(r)) set.add(r.colab); });
+  return [...set].sort();
+}
+const entre = (d, s, e) => !d || ((!s || d >= s) && (!e || d <= e));
+function buildColabOptions() {
+  const vs = document.getElementById('f-vig-s').value, ve = document.getElementById('f-vig-e').value;
+  const es = document.getElementById('f-em-s').value, ee = document.getElementById('f-em-e').value;
+  // Mesmo recorte de datas do applyFilters (linha sem a data passa)
+  const vals = colabsComProducao(r => entre(fmtD(r.vig), vs, ve) && entre(fmtD(r.em), es, ee), MS.col);
+  buildMultiSelect('ms-col', MS, 'col', vals, 'Todos');
+}
+function buildRetColabOptions() {
+  const p = getRetPeriodo();
+  // Produção com início de vigência no período, nos ramos que a aba considera
+  const vals = colabsComProducao(r => classifyRamo(r.ramo) !== 'excluded' && !!r.vig && entre(fmtD(r.vig), p.s, p.e), RET_MS.col);
+  buildMultiSelect('ms-ret-col', RET_MS, 'col', vals, 'Todos');
 }
 function buildTipoBtns() {
   const tipos = [...new Set(ALL.map(r => r.tipo).filter(Boolean))].sort();
@@ -1365,6 +1455,7 @@ function applyFilters() {
 function resetFilters() {
   ['f-vig-s', 'f-vig-e', 'f-em-s', 'f-em-e'].forEach(id => document.getElementById(id).value = '');
   Object.keys(MS).forEach(k => MS[k].clear());
+  buildColabOptions();
   [...document.querySelectorAll('.ms-wrap')].forEach(w => { if (w._msObj === MS && w._key) { renderMsListGeneric(w._list, w._vals, MS, w._key); updateMsTriggerGeneric(w, MS, w._key, w._placeholder); } });
   activeTipos = new Set(); document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
   activeCancelMotivos = null; FD = [...ALL]; FD_CLAIMS = [...CLAIMS];
@@ -1376,12 +1467,26 @@ function resetFilters() {
   if (document.getElementById('tab-metas').classList.contains('active')) renderMetasTab();
   if (document.getElementById('tab-sinistros').classList.contains('active')) renderSinistrosTab();
 }
+// Período padrão da aba: 1º de janeiro do ano corrente até hoje.
+function setRetPeriodoPadrao() {
+  const t = today();
+  document.getElementById('ret-per-s').value = `${t.getFullYear()}-01-01`;
+  document.getElementById('ret-per-e').value = fmtD(t);
+}
 function resetRetFilters() {
-  ['ret-vig-s', 'ret-vig-e', 'ret-can-s', 'ret-can-e'].forEach(id => document.getElementById(id).value = '');
+  setRetPeriodoPadrao();
   Object.keys(RET_MS).forEach(k => RET_MS[k].clear());
+  buildRetColabOptions();
   [...document.querySelectorAll('.ms-wrap')].forEach(w => { if (w._msObj === RET_MS && w._key) { renderMsListGeneric(w._list, w._vals, RET_MS, w._key); updateMsTriggerGeneric(w, RET_MS, w._key, w._placeholder); } });
   retActiveTipos = new Set();
+  retSoEvitavel = true;
+  document.getElementById('ret-evitavel-btn').classList.add('active');
   document.querySelectorAll('#ret-tipo-R,#ret-tipo-N,#ret-tipo-CR,#ret-tipo-CN').forEach(b => b.classList.remove('active'));
+  renderRetTab();
+}
+function toggleRetEvitavel() {
+  retSoEvitavel = !retSoEvitavel;
+  document.getElementById('ret-evitavel-btn').classList.toggle('active', retSoEvitavel);
   renderRetTab();
 }
 function toggleRetTipo(t, btn) {
@@ -1391,14 +1496,40 @@ function toggleRetTipo(t, btn) {
 }
 
 // ── Get retenção filtered data ─────────────────────────────────────────────────
-function getRetData() {
-  const vs = document.getElementById('ret-vig-s').value, ve = document.getElementById('ret-vig-e').value;
-  const cs = document.getElementById('ret-can-s').value, ce = document.getElementById('ret-can-e').value;
+// ── Churn evitável ────────────────────────────────────────────────────────────
+// Motivos de cancelamento que a corretora não tinha como evitar (comparação pelo
+// texto normalizado com normRamo: sem acento, maiúsculas). Qualquer motivo fora da
+// lista — inclusive o cancelamento sem motivo — conta como evitável.
+// Levantamento dos motivos da produção de 2026 em METRICAS.md.
+const MOTIVOS_NAO_EVITAVEIS = new Set([
+  'VENDA DO VEICULO', 'VENDA DO IMOVEL',                       // o bem saiu do cliente
+  'APOLICE REEMITIDA', 'EMITIDA NOVA PROPOSTA',                // o contrato continuou em outra apólice
+  'EMISSAO INDEVIDA', 'APOLICE CANCELADA POR ERRO DE EMISSAO', // erro operacional, não perda de cliente
+  'DADOS INCORRETOS', 'DADOS DO VEICULO INCORRETO',
+  'PERDA TOTAL', 'CANCELAMENTO DE APOLICE - SINISTRO INDEN',   // sinistro integral
+  'FALECIDO',
+].map(normRamo));
+// Cancelamento (a apólice cancelada ou o endosso CN/CR) não evitável: pelo motivo, ou
+// porque o cliente manteve o saldo de apólices (troca de seguradora, ver
+// applyTrocaSeguradora).
+const isMotivoNaoEvitavel = r => MOTIVOS_NAO_EVITAVEIS.has(normRamo(r.motivo));
+function isCancelNaoEvitavel(r) {
+  const cancel = r.sit === SIT.CANCELADA || r.tipo === 'CN' || r.tipo === 'CR';
+  return cancel && (isMotivoNaoEvitavel(r) || !!r.trocaSeg);
+}
+
+// Só os filtros de dimensão. O período não entra aqui porque cada painel o aplica
+// com a data que faz sentido para ele (ver getRetPeriodo / isChurnBase).
+// Regra de negócio: os ramos fora da meta (classifyRamo === 'excluded') também ficam
+// fora do churn, em todos os painéis da aba.
+// Com o filtro 'Só evitável' ligado, o cancelamento não evitável (e o endosso dele)
+// sai de todos os painéis — base e perda —, como Suspensa e Perda Total.
+//   opts.comNaoEvitaveis: ignora o filtro 'Só evitável' (para contar o que ele tirou).
+function getRetData(opts = {}) {
+  const soEvitavel = retSoEvitavel && !opts.comNaoEvitaveis;
   return ALL.filter(r => {
-    if (vs && r.vig && fmtD(r.vig) < vs) return false;
-    if (ve && r.vig && fmtD(r.vig) > ve) return false;
-    if (cs && r.cancel && fmtD(r.cancel) < cs) return false;
-    if (ce && r.cancel && fmtD(r.cancel) > ce) return false;
+    if (classifyRamo(r.ramo) === 'excluded') return false;
+    if (soEvitavel && isCancelNaoEvitavel(r)) return false;
     if (RET_MS.col.size > 0 && !RET_MS.col.has(r.colab)) return false;
     if (RET_MS.ram.size > 0 && !RET_MS.ram.has(r.ramo)) return false;
     if (RET_MS.grp.size > 0 && !RET_MS.grp.has(r.grp)) return false;
@@ -1621,66 +1752,112 @@ function renderRetTab() {
   if (!ALL.length) return;
   renderRetKPIs();
   if (sectionState['ret-charts']) renderRetCharts();
-  if (sectionState['ret-cohort']) renderCohorts();
-  if (sectionState['ret-risco']) renderRiskWarning();
   renderRetProdTable();
   renderRetDetailTable();
 }
 
-// ── Churn pela situação da apólice ─────────────────────────────────────────────
-// A apólice renovada vira 'Renovada' e a vigente nasce 'Ativa'. Por isso 'Renovada'
-// fica fora do universo: contá-la junto da sucessora duplicaria o mesmo contrato.
+// ── Churn do período ───────────────────────────────────────────────────────────
+// Churn = apólices perdidas no período ÷ apólices em vigor em algum dia do período.
 //
-// Universo (denominador) = apólices, sem endossos, que estiveram em vigor no período:
-//   Ativa (retida) + Cancelada (perdida na vigência) + Vencida (não renovada)
-// Perda (numerador) = Cancelada + Vencida.
-// Suspensa e Perda Total ficam fora dos dois lados — saíram por evento alheio à
-// retenção, mesma regra usada na taxa de renovação da aba Comparativo.
+// Base (denominador): apólices, sem endossos, tipo N/R, que estiveram em vigor entre
+// o início e o fim do período — início de vigência até o fim, saída a partir do início.
+// A saída é a data de cancelamento para Cancelada e o término de vigência para as demais.
+//
+// 'Renovada' é a apólice antiga, e a sucessora nasce como linha nova. Quando o término
+// da Renovada cai até o fim do período, a sucessora já está na base, e contar as duas
+// duplicaria o mesmo contrato. Então a Renovada só entra se o término cair depois do
+// fim do período (a sucessora ainda não começou).
+//
+// Perda (numerador): Cancelada ou Vencida com saída dentro do período. Cancelada ou
+// vencida depois do fim do período conta como retida naquele período.
+// Suspensa e Perda Total ficam fora dos dois lados, pela mesma regra da taxa de
+// renovação da aba Comparativo.
 const SIT_CHURN_PERDA = [SIT.CANCELADA, SIT.VENCIDA];
-const SIT_CHURN_UNIVERSO = [SIT.ATIVA, SIT.CANCELADA, SIT.VENCIDA];
+const SIT_CHURN_UNIVERSO = [SIT.ATIVA, SIT.RENOVADA, SIT.CANCELADA, SIT.VENCIDA];
 
-function isChurnBase(r) {
-  return isApolice(r) && (r.tipo === 'N' || r.tipo === 'R') && SIT_CHURN_UNIVERSO.includes(r.sit);
+// Período da aba como { s, e } em 'AAAA-MM-DD'. Campo vazio = sem limite daquele lado.
+function getRetPeriodo() {
+  return { s: document.getElementById('ret-per-s').value, e: document.getElementById('ret-per-e').value };
+}
+// Data em que a apólice saiu (ou sai) da carteira. Cancelada sem data de
+// cancelamento cai no término de vigência.
+function churnSaida(r) {
+  return fmtD(r.sit === SIT.CANCELADA && r.cancel ? r.cancel : r.fim);
+}
+const noPeriodo = (d, p) => !!d && (!p.s || d >= p.s) && (!p.e || d <= p.e);
+
+function isChurnBase(r, p) {
+  if (!isApolice(r) || (r.tipo !== 'N' && r.tipo !== 'R') || !SIT_CHURN_UNIVERSO.includes(r.sit)) return false;
+  const vig = fmtD(r.vig), saida = churnSaida(r);
+  if (!vig || !saida) return false;
+  if (p.e && vig > p.e) return false;   // começou depois do período
+  if (p.s && saida < p.s) return false; // já tinha saído antes do período
+  if (r.sit === SIT.RENOVADA && (!p.e || saida <= p.e)) return false; // sucessora já está na base
+  return true;
+}
+function isChurnPerda(r, p) {
+  return SIT_CHURN_PERDA.includes(r.sit) && noPeriodo(churnSaida(r), p);
 }
 function newChurnAcc(nome) {
-  return { nome, qtdBase: 0, premioBase: 0, comBase: 0, qtdAtiva: 0, qtdCancel: 0, premioCancel: 0, comEstorno: 0, vencidas: 0, premioVencido: 0 };
+  return { nome, qtdBase: 0, premioBase: 0, comBase: 0, qtdRetida: 0, qtdCancel: 0, premioCancel: 0, comPerdida: 0, canceladas: 0, vencidas: 0, premioVencido: 0 };
 }
-function accChurn(a, r) {
-  if (!isChurnBase(r)) return;
+function accChurn(a, r, p) {
+  if (!isChurnBase(r, p)) return;
   a.qtdBase++; a.premioBase += r.premio; a.comBase += r.com;
-  if (r.sit === SIT.ATIVA) a.qtdAtiva++;
-  if (SIT_CHURN_PERDA.includes(r.sit)) {
-    a.qtdCancel++; a.premioCancel += Math.abs(r.premio); a.comEstorno += Math.abs(r.com);
-  }
-  if (r.sit === SIT.VENCIDA) { a.vencidas++; a.premioVencido += r.premio; }
+  if (!isChurnPerda(r, p)) { a.qtdRetida++; return; }
+  a.qtdCancel++; a.premioCancel += Math.abs(r.premio); a.comPerdida += Math.abs(r.com);
+  if (r.sit === SIT.CANCELADA) a.canceladas++;
+  else { a.vencidas++; a.premioVencido += r.premio; }
 }
 
 // ── KPIs retenção ──────────────────────────────────────────────────────────────
 function renderRetKPIs() {
-  const data = getRetData();
+  const data = getRetData(), p = getRetPeriodo();
   const a = newChurnAcc('total');
-  data.forEach(r => accChurn(a, r));
+  data.forEach(r => accChurn(a, r, p));
   const pctChurnQtd = a.qtdBase > 0 ? a.qtdCancel / a.qtdBase : 0;
   const pctChurnPremio = a.premioBase > 0 ? a.premioCancel / a.premioBase : 0;
-  const pctChurnCom = a.comBase > 0 ? a.comEstorno / a.comBase : 0;
+  const pctChurnCom = a.comBase > 0 ? a.comPerdida / a.comBase : 0;
 
+  // Com 'Só evitável', o card de churn mostra também a taxa com todos os motivos
+  let subChurn = fN(a.qtdCancel) + ' perdidas no período';
+  if (retSoEvitavel) {
+    const t = newChurnAcc('todos');
+    let foraMotivo = 0, foraTroca = 0;
+    getRetData({ comNaoEvitaveis: true }).forEach(r => {
+      accChurn(t, r, p);
+      if (r.sit !== SIT.CANCELADA || !isChurnBase(r, p) || !isChurnPerda(r, p) || !isCancelNaoEvitavel(r)) return;
+      if (isMotivoNaoEvitavel(r)) foraMotivo++; else foraTroca++;
+    });
+    subChurn = fN(a.qtdCancel) + ' evitáveis · ' + fP(t.qtdBase > 0 ? t.qtdCancel / t.qtdBase : 0)
+      + ' com todos (fora: ' + fN(foraMotivo) + ' pelo motivo, ' + fN(foraTroca) + ' trocas de seguradora)';
+  }
+
+  document.getElementById('ret-kpi-badge').textContent = fmtRetPeriodo(p) + (retSoEvitavel ? ' · só evitável' : '');
   document.getElementById('ret-kpi-grid').innerHTML = [
-    { l: 'Apólices na base', v: fN(a.qtdBase), s: fN(a.qtdAtiva) + ' ativas + canc. + venc.', c: 'k-blue' },
+    { l: 'Apólices na base', v: fN(a.qtdBase), s: 'em vigor no período · ' + fN(a.qtdRetida) + ' retidas', c: 'k-blue' },
     { l: 'Prêmio na base', v: fBRL(a.premioBase), s: 'apólices, sem endossos', c: 'k-blue' },
     { l: 'Comissão na base', v: fBRL(a.comBase), s: 'apólices, sem endossos', c: 'k-blue' },
-    { l: 'Churn — Itens', v: fP(pctChurnQtd), s: fN(a.qtdCancel) + ' perdidas (canc. + venc.)', c: 'k-red' },
+    { l: 'Churn — Itens', v: fP(pctChurnQtd), s: subChurn, c: 'k-red' },
     { l: 'Churn — Prêmio', v: fP(pctChurnPremio), s: fBRL(a.premioCancel) + ' perdido', c: 'k-red' },
-    { l: 'Churn — Comissão', v: fP(pctChurnCom), s: fBRL(a.comEstorno) + ' a estornar', c: 'k-red' },
-    { l: 'Apólices não renovadas', v: fN(a.vencidas), s: 'situação = Vencida', c: 'k-amber' },
-    { l: 'Prêmio não renovado', v: fBRL(a.premioVencido), s: 'apólices vencidas', c: 'k-amber' },
+    { l: 'Churn — Comissão', v: fP(pctChurnCom), s: fBRL(a.comPerdida) + ' perdida', c: 'k-red' },
+    { l: 'Canceladas no período', v: fN(a.canceladas), s: 'saíram durante a vigência', c: 'k-amber' },
+    { l: 'Não renovadas no período', v: fN(a.vencidas), s: fBRL(a.premioVencido) + ' em prêmio', c: 'k-amber' },
   ].map(k => `<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-value" style="font-size:${k.v.length > 9 ? '16px' : '20px'}">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
 }
+const fmtRetPeriodo = p => {
+  const br = d => d.split('-').reverse().join('/');
+  if (p.s && p.e) return br(p.s) + ' a ' + br(p.e);
+  if (p.s) return 'desde ' + br(p.s);
+  if (p.e) return 'até ' + br(p.e);
+  return 'todo o histórico';
+};
 
 // ── Gráficos retenção ──────────────────────────────────────────────────────────
 function renderRetCharts() {
-  const data = getRetData();
-  const canceladas = data.filter(r => r.sit === 'Cancelada');
-  const vencidas = data.filter(r => r.sit === 'Vencida');
+  const data = getRetData(), p = getRetPeriodo();
+  const canceladas = data.filter(r => r.sit === 'Cancelada' && noPeriodo(churnSaida(r), p));
+  const vencidas = data.filter(r => r.sit === 'Vencida' && noPeriodo(churnSaida(r), p));
 
   // Gráfico 1: motivos cancelamento
   const mot = {}; canceladas.forEach(r => { const m = r.motivo || 'Não informado'; mot[m] = (mot[m] || 0) + 1; });
@@ -1697,8 +1874,8 @@ function renderRetCharts() {
   const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
   const mLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const byCan = {}, byVen = {};
-  canceladas.forEach(r => { if (!r.vig) return; const dt = r.vig instanceof Date ? r.vig : toDate(r.vig); if (!dt) return; const m = String(dt.getMonth() + 1).padStart(2, '0'); byCan[m] = (byCan[m] || 0) + 1; });
-  vencidas.forEach(r => { if (!r.vig) return; const dt = r.vig instanceof Date ? r.vig : toDate(r.vig); if (!dt) return; const m = String(dt.getMonth() + 1).padStart(2, '0'); byVen[m] = (byVen[m] || 0) + 1; });
+  canceladas.forEach(r => { const m = churnSaida(r).slice(5, 7); byCan[m] = (byCan[m] || 0) + 1; });
+  vencidas.forEach(r => { const m = churnSaida(r).slice(5, 7); byVen[m] = (byVen[m] || 0) + 1; });
   mkChart('ch-ret-evolucao', {
     type: 'line', data: {
       labels: mLabels, datasets: [
@@ -1710,143 +1887,10 @@ function renderRetCharts() {
 }
 
 
-// ── Análise de Coortes ──────────────────────────────────────────────────────────
-function renderCohorts() {
-  const data = getRetData();
-  const TIPOS_BASE_P = ['R', 'N', 'ER', 'EN'];
-  const cohorts = {};
-  data.forEach(r => {
-    if (!r.em) return;
-    if (!TIPOS_BASE_P.includes(r.tipo)) return;
-    const emDate = r.em instanceof Date ? r.em : toDate(r.em);
-    if (!emDate) return;
-    const y = emDate.getFullYear();
-    const m = String(emDate.getMonth() + 1).padStart(2, '0');
-    const cKey = `${y}-${m}`;
-    if (!cohorts[cKey]) cohorts[cKey] = { label: `${m}/${y}`, emitidas: 0, drops: {} };
-    cohorts[cKey].emitidas++;
-    if (r.sit === 'Cancelada' && r.cancel) {
-      const cDate = r.cancel instanceof Date ? r.cancel : toDate(r.cancel);
-      if (cDate) {
-        const diffMonths = (cDate.getFullYear() - emDate.getFullYear()) * 12 + (cDate.getMonth() - emDate.getMonth());
-        if (diffMonths >= 0 && diffMonths <= 12) {
-          cohorts[cKey].drops[diffMonths] = (cohorts[cKey].drops[diffMonths] || 0) + 1;
-        }
-      }
-    }
-  });
-
-  const keys = Object.keys(cohorts).sort();
-  if (!keys.length) {
-    document.getElementById('ret-cohort-wrap').innerHTML = '<div style="font-size:12px;color:#666">Sem dados de coorte na seleção</div>';
-    return;
-  }
-  let html = `<table class="ret-table" style="text-align:center"><thead><tr>
-        <th style="text-align:left">Emissão</th><th style="text-align:center;width:60px">Base</th>`;
-  for (let i = 0; i <= 12; i++) html += `<th style="text-align:center;width:55px">M${i}</th>`;
-  html += `</tr></thead><tbody>`;
-  keys.forEach(k => {
-    const c = cohorts[k];
-    html += `<tr><td style="text-align:left;font-weight:600">${c.label}</td><td style="font-weight:600">${c.emitidas}</td>`;
-    let remaining = c.emitidas;
-    for (let i = 0; i <= 12; i++) {
-      if (c.drops[i]) remaining -= c.drops[i];
-      const pct = c.emitidas > 0 ? (remaining / c.emitidas) : 0;
-      let bg = '';
-      let color = '';
-      if (c.emitidas > 0) {
-        const hue = Math.max(0, (pct - 0.7) * 3.33) * 120;
-        bg = `hsla(${hue}, 70%, 50%, ${dark() ? 0.25 : 0.15})`;
-        if (dark()) color = '#c9d1d9';
-      }
-      html += `<td style="background:${bg};color:${color};font-size:11px">${c.emitidas > 0 ? (pct * 100).toFixed(0) + '%' : '-'}</td>`;
-    }
-    html += `</tr>`;
-  });
-  html += `</tbody></table>`;
-  document.getElementById('ret-cohort-wrap').innerHTML = html;
-}
-
-// ── Score de Risco de Churn ────────────────────────────────────────────────────
-// Taxa histórica de perda por seguradora/ramo/colaborador, usada para pontuar risco.
-// Mesma definição de churn dos KPIs (ver accChurn): universo = apólices Ativa +
-// Cancelada + Vencida; perda = Cancelada + Vencida.
-function calcRiskRates() {
-  const metrics = { seg: {}, ram: {}, col: {} };
-  ALL.forEach(r => {
-    if (!isChurnBase(r)) return;
-    const perda = SIT_CHURN_PERDA.includes(r.sit);
-    ['seg', 'ramo', 'colab'].forEach(ft => {
-      const k = r[ft] || 'N/A';
-      const t = ft === 'ramo' ? 'ram' : ft === 'colab' ? 'col' : 'seg';
-      if (!metrics[t][k]) metrics[t][k] = { base: 0, churn: 0 };
-      metrics[t][k].base++;
-      if (perda) metrics[t][k].churn++;
-    });
-  });
-  const calcP = dict => {
-    const res = {};
-    for (let k in dict) res[k] = dict[k].base > 10 ? dict[k].churn / dict[k].base : 0;
-    return res;
-  };
-  return { seg: calcP(metrics.seg), ram: calcP(metrics.ram), col: calcP(metrics.col) };
-}
-
-function renderRiskWarning() {
-  const rates = calcRiskRates();
-  const todayStr = fmtD(today());
-  const d90Str = fmtD(addDays(today(), 90));
-
-  const inRisk = ALL.filter(r => r.sit === 'Ativa' && r.fim && fmtD(r.fim) >= todayStr && fmtD(r.fim) <= d90Str).map(r => {
-    const pSeg = rates.seg[r.seg || 'N/A'] || 0;
-    const pRam = rates.ram[r.ramo || 'N/A'] || 0;
-    const pCol = rates.col[r.colab || 'N/A'] || 0;
-    const score = (pSeg * 0.3) + (pRam * 0.3) + (pCol * 0.4);
-    let rank = 'Baixo';
-    if (score >= 0.15) rank = 'Alto';
-    else if (score >= 0.05) rank = 'Médio';
-    return { ...r, score, rank };
-  });
-
-  const hRisk = inRisk.filter(r => r.rank === 'Alto' || r.rank === 'Médio').sort((a, b) => b.score - a.score);
-  document.getElementById('ret-risco-badge').textContent = hRisk.length + ' alertas';
-
-  if (!hRisk.length) {
-    document.getElementById('ret-risco-wrap').innerHTML = '<div style="padding:16px;font-size:12px;color:#666">Nenhuma apólice em risco alto/médio nos próximos 90 dias.</div>';
-    return;
-  }
-
-  const riskBadge = {
-    'Alto': `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#fef2f2;color:#dc2626;border:0.5px solid #fca5a5">Alto</span>`,
-    'Médio': `<span style="display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#fffbeb;color:#d97706;border:0.5px solid #fcd34d">Médio</span>`
-  };
-
-  const tbody = hRisk.map(r => `<tr>
-        <td>${r.fim ? fmtD(r.fim) : '-'}</td>
-        <td class="name-cell" title="${r.cli}">${r.cli}</td>
-        <td>${r.ramo.toLowerCase().replace(/^\w/, c => c.toUpperCase())}</td>
-        <td>${r.colab.split(' - ')[0].trim()}</td>
-        <td class="num">${fBRL(r.premio)}</td>
-        <td style="text-align:center">${riskBadge[r.rank] || '-'}</td>
-      </tr>`).join('');
-
-  document.getElementById('ret-risco-wrap').innerHTML = `<table class="ret-table">
-        <thead><tr>
-          <th>Vence em</th>
-          <th>Cliente</th>
-          <th>Ramo</th>
-          <th>Colaborador</th>
-          <th style="text-align:right">Prêmio</th>
-          <th style="text-align:center">Risco</th>
-        </tr></thead>
-        <tbody>${tbody}</tbody>
-      </table>`;
-}
-
 // ── Tabela churn por produtor ──────────────────────────────────────────────────
 
 function renderRetProdTable() {
-  const data = getRetData();
+  const data = getRetData(), p = getRetPeriodo();
   const viewKey = getMetric('vt-ret') === 'grp' ? 'grp' : 'colab';
   const label = getMetric('vt-ret') === 'grp' ? 'Grupo' : 'Colaborador';
 
@@ -1855,14 +1899,14 @@ function renderRetProdTable() {
   data.forEach(r => {
     const k = r[viewKey] || 'Sem identificação';
     if (!map[k]) map[k] = newChurnAcc(k);
-    accChurn(map[k], r);
+    accChurn(map[k], r, p);
   });
 
-  let rows = Object.values(map).map(v => ({
+  let rows = Object.values(map).filter(v => v.qtdBase > 0).map(v => ({
     ...v,
     pctQtd: v.qtdBase > 0 ? v.qtdCancel / v.qtdBase : 0,
     pctPremio: v.premioBase > 0 ? v.premioCancel / v.premioBase : 0,
-    pctCom: v.comBase > 0 ? v.comEstorno / v.comBase : 0
+    pctCom: v.comBase > 0 ? v.comPerdida / v.comBase : 0
   }));
 
   // Sort
@@ -1882,7 +1926,7 @@ function renderRetProdTable() {
   const totPremioBase = rows.reduce((s, r) => s + r.premioBase, 0);
   const totPremioCancel = rows.reduce((s, r) => s + r.premioCancel, 0);
   const totComBase = rows.reduce((s, r) => s + r.comBase, 0);
-  const totComEstorno = rows.reduce((s, r) => s + r.comEstorno, 0);
+  const totComPerdida = rows.reduce((s, r) => s + r.comPerdida, 0);
   const totVenc = rows.reduce((s, r) => s + r.vencidas, 0);
 
   const tbody = rows.map(r => {
@@ -1895,7 +1939,7 @@ function renderRetProdTable() {
       <td class="num">${fBRL(r.premioBase)}</td>
       <td class="num">${fBRL(r.premioCancel)}</td>
       <td class="num">${churnBadge(r.pctPremio)}</td>
-      <td class="num">${fBRL(r.comEstorno)}</td>
+      <td class="num">${fBRL(r.comPerdida)}</td>
       <td class="num">${churnBadge(r.pctCom)}</td>
       <td class="num" style="color:#BA7517">${fN(r.vencidas)}</td>
     </tr>`;
@@ -1911,7 +1955,7 @@ function renderRetProdTable() {
         ${th('premioBase', 'Prêmio base', 'right')}
         ${th('premioCancel', 'Prêmio perdido', 'right')}
         ${th('pctPremio', '% Churn prêmio')}
-        ${th('comEstorno', 'Comissão estorno', 'right')}
+        ${th('comPerdida', 'Comissão perdida', 'right')}
         ${th('pctCom', '% Churn comissão')}
         ${th('vencidas', 'Vencidas')}
       </tr></thead>
@@ -1924,8 +1968,8 @@ function renderRetProdTable() {
         <td class="num">${fBRL(totPremioBase)}</td>
         <td class="num">${fBRL(totPremioCancel)}</td>
         <td class="num">${churnBadge(totPremioBase > 0 ? totPremioCancel / totPremioBase : 0)}</td>
-        <td class="num">${fBRL(totComEstorno)}</td>
-        <td class="num">${churnBadge(totComBase > 0 ? totComEstorno / totComBase : 0)}</td>
+        <td class="num">${fBRL(totComPerdida)}</td>
+        <td class="num">${churnBadge(totComBase > 0 ? totComPerdida / totComBase : 0)}</td>
         <td class="num">${fN(totVenc)}</td>
       </tr></tfoot>
     </table>`;
@@ -1946,14 +1990,21 @@ function toggleRetDetailFilter(sit) {
   renderRetDetailTable();
 }
 
+// Estornos (CN/CR) datados pelo cancelamento, ou pelo início do endosso quando falta
+// a data; vencidas pelo término de vigência. Os dois dentro do período da aba.
+function getRetDetailRows() {
+  const p = getRetPeriodo();
+  const estorno = r => (r.tipo === 'CN' || r.tipo === 'CR') && noPeriodo(fmtD(r.cancel || r.vig), p);
+  const vencida = r => r.sit === SIT.VENCIDA && noPeriodo(fmtD(r.fim), p);
+  return getRetData().filter(r => {
+    if (retDetailFilter === 'CNCR') return estorno(r);
+    if (retDetailFilter === 'Vencida') return vencida(r);
+    return estorno(r) || vencida(r);
+  });
+}
+
 function renderRetDetailTable() {
-  const data = getRetData();
-  const rows = data.filter(r => {
-    if (retDetailFilter === 'CNCR') return r.tipo === 'CN' || r.tipo === 'CR';
-    if (retDetailFilter === 'Vencida') return r.sit === 'Vencida';
-    // Todas: CN/CR + Vencidas
-    return r.tipo === 'CN' || r.tipo === 'CR' || r.sit === 'Vencida';
-  }).sort((a, b) => Math.abs(b.premio || 0) - Math.abs(a.premio || 0));
+  const rows = getRetDetailRows().sort((a, b) => Math.abs(b.premio || 0) - Math.abs(a.premio || 0));
 
   document.getElementById('ret-detail-badge').textContent = fN(rows.length) + ' registros';
 
@@ -2454,25 +2505,28 @@ function exportData(type) {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Producao");
     XLSX.writeFile(workbook, "Export_Producao.xlsx");
   } else if (type === 'churn') {
-    const rawData = getRetData();
+    const rawData = getRetData(), p = getRetPeriodo();
     const viewKey = getMetric('vt-ret') === 'grp' ? 'grp' : 'colab';
     const map = {};
     rawData.forEach(r => {
       const k = r[viewKey] || 'Sem identificação';
       if (!map[k]) map[k] = newChurnAcc(k);
-      accChurn(map[k], r);
+      accChurn(map[k], r, p);
     });
-    const rows = Object.values(map).map(v => ({
+    const rows = Object.values(map).filter(v => v.qtdBase > 0).map(v => ({
+      'Período': fmtRetPeriodo(p),
+      'Churn': retSoEvitavel ? 'Só evitável' : 'Todos os motivos',
       'Nome': v.nome,
       'Base (apólices)': v.qtdBase,
-      'Ativas': v.qtdAtiva,
+      'Retidas': v.qtdRetida,
       'Perdidas (canc+venc)': v.qtdCancel,
+      'Canceladas': v.canceladas,
       '% Churn itens': v.qtdBase > 0 ? (v.qtdCancel / v.qtdBase) : 0,
       'Prêmio base': v.premioBase,
       'Prêmio perdido': v.premioCancel,
       '% Churn prêmio': v.premioBase > 0 ? (v.premioCancel / v.premioBase) : 0,
-      'Comissão estorno': v.comEstorno,
-      '% Churn comissão': v.comBase > 0 ? (v.comEstorno / v.comBase) : 0,
+      'Comissão perdida': v.comPerdida,
+      '% Churn comissão': v.comBase > 0 ? (v.comPerdida / v.comBase) : 0,
       'Vencidas': v.vencidas
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -2480,11 +2534,7 @@ function exportData(type) {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Churn");
     XLSX.writeFile(workbook, "Export_Churn.xlsx");
   } else if (type === 'detalhe') {
-    const rawData = getRetData().filter(r => {
-      if (retDetailFilter === 'CNCR') return r.tipo === 'CN' || r.tipo === 'CR';
-      if (retDetailFilter === 'Vencida') return r.sit === 'Vencida';
-      return r.tipo === 'CN' || r.tipo === 'CR' || r.sit === 'Vencida';
-    });
+    const rawData = getRetDetailRows();
     const tLabel = { R: 'Renovação', N: 'Novo', ER: 'End. renov.', EN: 'End. novo', CR: 'Cancel. renov.', CN: 'Cancel. novo' };
     const rows = rawData.map(r => ({
       'Tipo': tLabel[r.tipo] || r.tipo,

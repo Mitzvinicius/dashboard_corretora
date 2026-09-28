@@ -21,7 +21,7 @@ O código só conhecia `Ativa`, `Cancelada` e `Vencida`. A planilha emite també
 | `Vencida` | Chegou ao término e **não** foi renovada |
 | `Cancelada` | Encerrada no meio da vigência |
 | `Suspensa` | Suspensa |
-| `Perda Total` | Encerrada por sinistro integral |
+| `Perda Total` | Encerrada por sinistro integral. A planilha também emite `Perda total`; `normSit` padroniza a caixa na leitura |
 
 **A consequência mais importante:** a planilha já carrega o desfecho de cada apólice.
 Não é preciso casar chave nenhuma para saber se uma apólice renovou — basta ler a
@@ -102,28 +102,112 @@ Numerador: linhas de tipo `CN`/`CR` (os *endossos* de cancelamento).
 
 ### O que é
 
+> Revisado em **28/09/2026**. A versão anterior somava as `Ativa` de hoje com
+> **todas** as `Cancelada`/`Vencida` da história — um estoque dividido por um fluxo,
+> sem período. O churn crescia só por a planilha ter mais anos.
+
+Churn passou a ser **de um período** (filtro *Período de análise* da aba, padrão
+1º de janeiro até hoje):
+
+```
+churn = perdidas no período ÷ apólices em vigor em algum dia do período
+```
+
+**Saída** de uma apólice: `DATA CANCELAMENTO` se `Cancelada` (cai no término se a
+data faltar); `TÉRMINO DE VIGÊNCIA` nas demais situações.
+
 | | Regra |
 |---|---|
-| **Universo** (denominador) | apólices (`isApolice`), tipo `N`/`R`, `sit ∈ {Ativa, Cancelada, Vencida}` |
-| **Perda** (numerador) | `sit ∈ {Cancelada, Vencida}` |
-| **Fora dos dois lados** | `Renovada`, `Suspensa`, `Perda Total` |
+| **Base** (denominador) | apólices (`isApolice`), tipo `N`/`R`, `sit ∈ {Ativa, Renovada, Cancelada, Vencida}`, com início ≤ fim do período **e** saída ≥ início do período |
+| **Exceção na base** | `Renovada` com término ≤ fim do período fica fora — a sucessora já nasceu dentro do período e está contada |
+| **Perda** (numerador) | `sit ∈ {Cancelada, Vencida}` com saída **dentro** do período |
+| **Retida** | na base e não perdida no período (inclui quem cancelou/venceu depois do fim) |
+| **Fora dos dois lados** | `Suspensa`, `Perda Total` |
+| **Ramos fora** | os mesmos excluídos da meta (`classifyRamo(r.ramo) === 'excluded'`, lista em `META_EXCLUDED_KEYS`): viagem, carta verde, acidentes pessoais, previdência, VGBL, eventos aleatórios, transporte nacional e educacional. Vale para todos os painéis da aba e o seletor de ramo nem os oferece |
 
-`Renovada` fora porque sua sucessora já está contada como `Ativa`.
-`Suspensa` e `Perda Total` fora pela mesma regra da taxa de renovação — coerência
-entre as duas métricas.
+**Por que a `Renovada` voltou para a base.** Olhando um período passado, a apólice
+que renovou *depois* dele era a linha que representava o contrato ali — sem ela o
+contrato sumia da base daquele ano. A regra do término resolve a duplicidade: cada
+contrato entra uma vez, pela última apólice que começou até o fim do período.
+
+Limite conhecido: renovação cujo término da antiga cai no último dia do período e a
+sucessora começa no dia seguinte some da base daquele período. É raro e não
+compensa casar chave de apólice para evitar.
+
+Os painéis que não usam o agregador aplicam o período pela data da perda: os
+gráficos de cancelamento pela saída, o detalhe pela data de cancelamento (estornos
+CN/CR) ou término (vencidas).
+
+### Churn evitável (filtro *Só evitável*, ligado por padrão)
+
+Para medir o churn que o colaborador tinha como evitar (metas trimestrais), o
+cancelamento não evitável — pelo motivo (lista `MOTIVOS_NAO_EVITAVEIS`) ou por ter
+sido troca de seguradora — sai de **base e perda**, em
+todos os painéis da aba (`isCancelNaoEvitavel`, aplicado em `getRetData`):
+
+| Grupo | Motivos |
+|---|---|
+| O bem saiu do cliente | venda do veículo, venda do imóvel |
+| O contrato continuou | apólice reemitida, emitida nova proposta |
+| Erro operacional | emissão indevida, apólice cancelada por erro de emissão, dados incorretos, dados do veículo incorreto |
+| Sinistro integral | perda total, cancelamento de apólice – sinistro inden. |
+| Outros | falecido |
+
+**Sem motivo conta como evitável** (decisão de 28/09/2026). Também evitáveis:
+solicitação do segurado, a pedido do cliente, falta de pagamento, pedido do corretor,
+restrições técnicas/financeiras. Com o filtro ligado, o card *Churn — Itens* mostra
+também a taxa com todos os motivos e quantos saíram pelo motivo e pela troca de
+seguradora (abaixo).
+
+**Motivo vem primeiro do endosso.** O Quiver costuma gravar o motivo no endosso de
+cancelamento (CN/CR), não na apólice: em 2026, 23 apólices canceladas só tinham
+motivo no endosso. `applyMotivoEndosso` copia para a apólice o motivo do endosso mais
+recente (vínculo seguradora + número da apólice); o motivo da própria apólice só vale
+sem endosso com motivo. Vale para o dashboard inteiro, não só para a Retenção.
+
+**Troca de seguradora pelo saldo do cliente** (`applyTrocaSeguradora`). É prática da
+corretora cancelar a apólice e reemitir em outra cia — muitas vezes como `R`, para
+aproveitar o bônus de renovação — e o motivo quase nunca registra isso. A regra
+compara o número de apólices do cliente (CPF/CNPJ + ramo):
+
+- **antes** = a cancelada + as outras em vigor 15 dias antes do cancelamento (a nova
+  costuma nascer uns dias antes de o cancelamento ser lançado), ou no início da
+  cancelada se ela começou depois disso
+- **depois** = as em vigor 90 dias depois do cancelamento — ou hoje, enquanto os 90
+  dias não passaram (a cancelada recente conta como perda até a troca aparecer)
+
+`depois ≥ antes` → troca, não evitável. Cobre também o caso do bônus aproveitado em
+dois itens (2 apólices, 1 cancela, sai 1 R + 1 N, saldo 3). A marca `r.trocaSeg` vai
+na apólice e nos endossos CN/CR dela.
+
+A apólice cancelada entra sempre no *antes*, mesmo cancelada no próprio dia do
+início: em 2026, 19 foram canceladas antes de começar a vigorar.
+
+Em 2026 (149 apólices canceladas, ramos da meta): 58 trocas (5 com saldo maior),
+91 com saldo menor. Combinando motivo e saldo, sobram 77 cancelamentos evitáveis — o
+churn de itens cai de 2,64% (todos) para 1,43% (só evitável).
+
+Limites conhecidos: cada cancelamento é avaliado sozinho, então dois cancelamentos do
+mesmo cliente e ramo na mesma janela compartilham o saldo (6 casos em 2026); e uma
+vencida de outro item do cliente dentro da janela derruba o *depois*, fazendo a troca
+parecer perda.
 
 Implementado num agregador único (`newChurnAcc` / `accChurn` / `isChurnBase`)
-consumido pelos **quatro** pontos que antes divergiam entre si:
+consumido pelos pontos que antes divergiam entre si:
 
 1. KPIs da Retenção (`renderRetKPIs`)
 2. Tabela de churn por produtor (`renderRetProdTable`)
 3. Export Excel (`exportData('churn')`)
-4. **Score de risco de churn** (`calcRiskRates`) — incluído para o dashboard não
-   exibir uma taxa e pontuar o risco por outra
+
+O painel *Apólices em risco de não renovação* (score por seguradora/ramo/colaborador)
+e a *Análise de coorte* foram removidos da aba em 28/09/2026: não traziam dado
+confiável para o momento da empresa.
 
 Rótulos que mudaram junto: `"Apólices ativas (base)"` → `"Apólices na base"` (o
 denominador não é mais só ativas); no export, `"CR+CN (qtd)"` → `"Perdidas
-(canc+venc)"`, com coluna `Ativas` nova.
+(canc+venc)"`. Na revisão de 28/09: `Ativas` → `Retidas`, colunas `Período` e
+`Canceladas` novas, e `"Comissão estorno"` → `"Comissão perdida"` (vencida não gera
+estorno, então o nome antigo inflava o que era estorno de fato).
 
 ---
 
@@ -319,11 +403,6 @@ contrato, e não as faturas daqueles meses.
 
 ## 7. Pendências e decisões em aberto
 
-- **Análise de coortes** (`renderCohorts`) segue na regra antiga: rastreia queda mês
-  a mês por `sit === 'Cancelada' && r.cancel`, ou seja, depende da *data* do evento.
-  `Vencida` não tem data própria — o equivalente seria o `fim`. Incluir muda a
-  natureza do gráfico (misturaria cancelamento no meio da vigência com
-  não-renovação no vencimento). **Não decidido.**
 - **Tabela de detalhe da Retenção** filtra por `CN`/`CR`/`Vencida`, então
   `Renovada`, `Suspensa` e `Perda Total` nunca chegam nela. Os estilos de badge já
   existem para as seis situações; falta decidir se devem aparecer.
