@@ -13,6 +13,16 @@
         "-c-1"
       ],
       "port": 5500
+    },
+    {
+      "name": "dashboard-py",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5500"
+      ],
+      "port": 5500
     }
   ]
 }
