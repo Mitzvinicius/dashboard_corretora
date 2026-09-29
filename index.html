@@ -318,8 +318,6 @@
           <div style="display:flex;gap:4px;flex-wrap:wrap">
             <button class="tipo-btn" id="ret-tipo-R" onclick="toggleRetTipo('R',this)">R — Renovação</button>
             <button class="tipo-btn" id="ret-tipo-N" onclick="toggleRetTipo('N',this)">N — Novo</button>
-            <button class="tipo-btn" id="ret-tipo-CR" onclick="toggleRetTipo('CR',this)">CR — Cancel. renov.</button>
-            <button class="tipo-btn" id="ret-tipo-CN" onclick="toggleRetTipo('CN',this)">CN — Cancel. novo</button>
           </div>
         </div>
         <div class="f-group">
@@ -342,7 +340,7 @@
         </div>
         <div class="section-body" id="sb-ret-kpis">
           <div style="padding:16px">
-            <div class="kpi-grid" id="ret-kpi-grid"></div>
+            <div id="ret-kpi-grid"></div>
           </div>
         </div>
       </div>
@@ -411,8 +409,8 @@
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="btn-sm" id="ret-filter-all-btn" onclick="toggleRetDetailFilter('')"
                 style="font-size:11px;border-color:#378ADD;font-weight:600">Todas</button>
-              <button class="btn-sm" id="ret-filter-cncr-btn" onclick="toggleRetDetailFilter('CNCR')"
-                style="font-size:11px">CR + CN (estornos)</button>
+              <button class="btn-sm" id="ret-filter-canc-btn" onclick="toggleRetDetailFilter('Cancelada')"
+                style="font-size:11px">Canceladas</button>
               <button class="btn-sm" id="ret-filter-venc-btn" onclick="toggleRetDetailFilter('Vencida')"
                 style="font-size:11px">Vencidas</button>
             </div>
@@ -421,6 +419,9 @@
         </div>
         <div class="section-body" id="sb-ret-detail">
           <div class="detail-table-wrap" id="ret-detail-wrap"></div>
+          <div id="ret-detail-pagination"
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--border-subtle)">
+          </div>
         </div>
       </div>
 

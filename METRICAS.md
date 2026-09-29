@@ -122,6 +122,7 @@ data faltar); `TÉRMINO DE VIGÊNCIA` nas demais situações.
 | **Exceção na base** | `Renovada` com término ≤ fim do período fica fora — a sucessora já nasceu dentro do período e está contada |
 | **Perda** (numerador) | `sit ∈ {Cancelada, Vencida}` com saída **dentro** do período |
 | **Retida** | na base e não perdida no período (inclui quem cancelou/venceu depois do fim) |
+| **Churn só cancelamento** | mesma base; no numerador, só as `Cancelada` com saída no período (sem as `Vencida`). Linha própria de cards na aba (itens, prêmio, comissão), abaixo da linha do churn total; coluna *% Só cancel.* na tabela por produtor e três colunas no export |
 | **Fora dos dois lados** | `Suspensa`, `Perda Total` |
 | **Ramos fora** | os mesmos excluídos da meta (`classifyRamo(r.ramo) === 'excluded'`, lista em `META_EXCLUDED_KEYS`): viagem, carta verde, acidentes pessoais, previdência, VGBL, eventos aleatórios, transporte nacional e educacional. Vale para todos os painéis da aba e o seletor de ramo nem os oferece |
 
@@ -134,9 +135,13 @@ Limite conhecido: renovação cujo término da antiga cai no último dia do per�
 sucessora começa no dia seguinte some da base daquele período. É raro e não
 compensa casar chave de apólice para evitar.
 
-Os painéis que não usam o agregador aplicam o período pela data da perda: os
-gráficos de cancelamento pela saída, o detalhe pela data de cancelamento (estornos
-CN/CR) ou término (vencidas).
+Os gráficos e o detalhe apólice a apólice listam as mesmas perdas dos KPIs
+(`isChurnBase` + `isChurnPerda`), então os totais batem: o detalhe mostra *X perdidas*
+igual ao card, e o gráfico de motivos soma as canceladas do card. A evolução mensal
+agrupa pelo mês da saída, com eixo em ano-mês do início ao fim do período.
+Os endossos CN/CR não aparecem mais no detalhe — o motivo deles já foi levado para a
+apólice (`applyMotivoEndosso`). Os botões de tipo CR/CN saíram da aba: a base só
+aceita N/R, então eles zeravam os KPIs.
 
 ### Churn evitável (filtro *Só evitável*, ligado por padrão)
 
@@ -198,6 +203,23 @@ consumido pelos pontos que antes divergiam entre si:
 1. KPIs da Retenção (`renderRetKPIs`)
 2. Tabela de churn por produtor (`renderRetProdTable`)
 3. Export Excel (`exportData('churn')`)
+4. Gráficos e detalhe da Retenção (`renderRetCharts`, `getRetDetailRows`)
+
+A Visão Geral calculava um churn (`canceladas ÷ linhas`) que nenhum card exibia;
+o cálculo foi removido.
+
+**A taxa de churn do Comparativo tem regra própria** (decisão de 28/09/2026), porque a
+aba compara com o ano anterior (`calcChurnComp`):
+
+```
+churn = 1 − renovações (R) do período ÷ apólices N + R do mesmo período do ano anterior
+```
+
+Conta apólices (`isApolice`, sem endossos/faturas), em **todos os ramos**, com os
+filtros globais; as duas pontas ancoradas no início de vigência. O valor do período
+anterior faz a mesma conta um ano antes (usa o período de dois anos atrás como base).
+Pode ficar negativo quando entram mais renovações do que havia de base — renovação
+de apólice vinda de outra corretora, por exemplo. Antes era `(CN + CR) ÷ produção`.
 
 O painel *Apólices em risco de não renovação* (score por seguradora/ramo/colaborador)
 e a *Análise de coorte* foram removidos da aba em 28/09/2026: não traziam dado
@@ -401,11 +423,27 @@ contrato, e não as faturas daqueles meses.
 
 ---
 
+## 6.1 Carteira ativa de hoje (Exibição TV)
+
+A barra do ano corrente no gráfico de carteira e a contagem de *Clientes por nível*
+usam `tvCarteiraAtivaHoje`: apólices (`isApolice`) N/R com `SITUAÇÃO = Ativa`, fora
+viagem/carta verde e vigência < 350 dias, e com duas proteções contra arquivo de ano
+anterior desatualizado:
+
+- `Ativa` com término vencido há mais de 15 dias não conta;
+- o mesmo número de apólice na mesma seguradora conta uma vez (fica o início mais recente).
+
+Motivo: em set/2026 o `producao_2025.xlsx` estava parado e o gráfico mostrava 7.736
+apólices contra ~7.570 do relatório de ativas do ERP — 103 `Ativa` já vencidas e 35
+números repetidos. O painel de fontes passou a apontar esse caso (coluna *Ativas
+vencidas*, ver `contarAtivasVencidas`). As proteções não substituem reexportar o
+arquivo: o churn continua dependendo da situação correta.
+
 ## 7. Pendências e decisões em aberto
 
-- **Tabela de detalhe da Retenção** filtra por `CN`/`CR`/`Vencida`, então
-  `Renovada`, `Suspensa` e `Perda Total` nunca chegam nela. Os estilos de badge já
-  existem para as seis situações; falta decidir se devem aparecer.
+- **Prêmio em risco (Comparativo)** ainda soma as canceladas que começaram no
+  período, pela regra antiga. Não é taxa de churn, mas diverge do *prêmio perdido*
+  da aba Retenção.
 - **Cross-sell e contagem de ativas da Exibição TV** filtram `sit === 'Ativa'`.
   Excluir `Renovada` provavelmente está certo (a sucessora é que é a vigente), mas
   não foi auditado.
