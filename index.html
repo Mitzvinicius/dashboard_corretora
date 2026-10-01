@@ -292,15 +292,9 @@
         <div style="font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.5px;width:100%">
           Filtros desta aba</div>
         <div class="f-group">
-          <span class="f-label">Vigência (início)</span>
+          <span class="f-label" title="Base = apólices em vigor em algum dia do período. Perda = cancelada ou vencida dentro do período. Padrão: 1º de janeiro até hoje.">Período de análise</span>
           <div class="date-pair">
-            <input type="date" id="ret-vig-s"><span class="date-sep">&#8594;</span><input type="date" id="ret-vig-e">
-          </div>
-        </div>
-        <div class="f-group">
-          <span class="f-label">Data cancelamento</span>
-          <div class="date-pair">
-            <input type="date" id="ret-can-s"><span class="date-sep">&#8594;</span><input type="date" id="ret-can-e">
+            <input type="date" id="ret-per-s"><span class="date-sep">&#8594;</span><input type="date" id="ret-per-e">
           </div>
         </div>
         <div class="f-group">
@@ -324,9 +318,11 @@
           <div style="display:flex;gap:4px;flex-wrap:wrap">
             <button class="tipo-btn" id="ret-tipo-R" onclick="toggleRetTipo('R',this)">R — Renovação</button>
             <button class="tipo-btn" id="ret-tipo-N" onclick="toggleRetTipo('N',this)">N — Novo</button>
-            <button class="tipo-btn" id="ret-tipo-CR" onclick="toggleRetTipo('CR',this)">CR — Cancel. renov.</button>
-            <button class="tipo-btn" id="ret-tipo-CN" onclick="toggleRetTipo('CN',this)">CN — Cancel. novo</button>
           </div>
+        </div>
+        <div class="f-group">
+          <span class="f-label" title="Tira da conta os cancelamentos que a corretora não tinha como evitar: venda do bem, reemissão, erro de emissão, falecimento, perda total. Sem motivo conta como evitável.">Churn</span>
+          <button class="tipo-btn active" id="ret-evitavel-btn" onclick="toggleRetEvitavel()">Só evitável</button>
         </div>
         <div class="f-group" style="margin-left:auto;justify-content:flex-end">
           <button class="btn-sm" onclick="resetRetFilters()">&#8635; Limpar</button>
@@ -336,14 +332,15 @@
       <!-- KPIs retenção -->
       <div class="section-card" id="sc-ret-kpis">
         <div class="section-header open" onclick="toggleSection('ret-kpis')">
-          <span class="section-title">Indicadores de churn</span>
+          <span class="section-title">Indicadores de churn <span class="section-title-badge"
+              id="ret-kpi-badge"></span></span>
           <div class="section-controls" onclick="event.stopPropagation()">
             <button class="collapse-btn" id="cb-ret-kpis">−</button>
           </div>
         </div>
         <div class="section-body" id="sb-ret-kpis">
           <div style="padding:16px">
-            <div class="kpi-grid" id="ret-kpi-grid"></div>
+            <div id="ret-kpi-grid"></div>
           </div>
         </div>
       </div>
@@ -379,19 +376,6 @@
         </div>
       </div>
 
-      <!-- Análise de Coortes -->
-      <div class="section-card" id="sc-ret-cohort">
-        <div class="section-header open" onclick="toggleSection('ret-cohort')">
-          <span class="section-title">Análise de Coorte (Sobrevivência da Base)</span>
-          <div class="section-controls" onclick="event.stopPropagation()">
-            <button class="collapse-btn" id="cb-ret-cohort">−</button>
-          </div>
-        </div>
-        <div class="section-body" id="sb-ret-cohort">
-          <div class="ret-table-wrap" id="ret-cohort-wrap" style="padding:16px;"></div>
-        </div>
-      </div>
-
       <!-- Tabela churn por produtor -->
       <div class="section-card" id="sc-ret-prod">
         <div class="section-header open" onclick="toggleSection('ret-prod')">
@@ -414,20 +398,6 @@
         </div>
       </div>
 
-      <!-- Apólices em Risco de Não Renovação -->
-      <div class="section-card" id="sc-ret-risco">
-        <div class="section-header open" onclick="toggleSection('ret-risco')">
-          <span class="section-title">Apólices em Risco de Não Renovação <span class="section-title-badge"
-              id="ret-risco-badge"></span></span>
-          <div class="section-controls" onclick="event.stopPropagation()">
-            <button class="collapse-btn" id="cb-ret-risco">−</button>
-          </div>
-        </div>
-        <div class="section-body" id="sb-ret-risco">
-          <div class="ret-table-wrap" id="ret-risco-wrap"></div>
-        </div>
-      </div>
-
       <!-- Tabela detalhe apólice a apólice -->
       <div class="section-card" id="sc-ret-detail">
         <div class="section-header open" onclick="toggleSection('ret-detail')">
@@ -439,8 +409,8 @@
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="btn-sm" id="ret-filter-all-btn" onclick="toggleRetDetailFilter('')"
                 style="font-size:11px;border-color:#378ADD;font-weight:600">Todas</button>
-              <button class="btn-sm" id="ret-filter-cncr-btn" onclick="toggleRetDetailFilter('CNCR')"
-                style="font-size:11px">CR + CN (estornos)</button>
+              <button class="btn-sm" id="ret-filter-canc-btn" onclick="toggleRetDetailFilter('Cancelada')"
+                style="font-size:11px">Canceladas</button>
               <button class="btn-sm" id="ret-filter-venc-btn" onclick="toggleRetDetailFilter('Vencida')"
                 style="font-size:11px">Vencidas</button>
             </div>
@@ -449,6 +419,9 @@
         </div>
         <div class="section-body" id="sb-ret-detail">
           <div class="detail-table-wrap" id="ret-detail-wrap"></div>
+          <div id="ret-detail-pagination"
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--border-subtle)">
+          </div>
         </div>
       </div>
 

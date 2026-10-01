@@ -92,7 +92,7 @@ A base de produção vive **quebrada em um arquivo por ano** na pasta `Dashboard
 /Santolin/Dashboard/producao_2021.xlsx
                     producao_2022.xlsx
                     …
-                    producao_2026.xlsx     ← só este é substituído no dia a dia
+                    producao_2026.xlsx     ← substituído no dia a dia
 ```
 
 Para atualizar:
@@ -101,6 +101,22 @@ Para atualizar:
 2. Salvar como `producao_<ano>.xlsx`.
 3. Soltar na pasta `Dashboard` do SharePoint, sobrescrevendo o arquivo daquele ano.
 4. Recarregar o dashboard. No cabeçalho, clicar em **"N arquivos"** para conferir o painel de fontes.
+
+> ⚠️ **Reexporte também o arquivo do ano anterior.** Cada arquivo guarda a
+> `SITUAÇÃO` do dia em que foi exportado. Quando uma apólice de 2025 renova em 2026, a
+> linha de 2025 só vira `Renovada` se o `producao_2025.xlsx` for exportado de novo —
+> senão ela continua `Ativa` e o contrato conta duas vezes (a sucessora também é
+> `Ativa`). Aconteceu em set/2026: o `producao_2025` parado inflou a carteira ativa
+> da Exibição TV em ~177 apólices e escondia perdas do churn de 2025.
+>
+> Regra prática: enquanto houver apólices do ano anterior vencendo (ou seja, o ano
+> todo, para apólices anuais), atualize os **dois** arquivos juntos — pelo menos uma
+> vez por mês. Os anos mais antigos só precisam de nova exportação quando houver
+> apólice plurianual ou cancelamento retroativo.
+>
+> O painel de fontes avisa: a coluna **Ativas vencidas** conta, por arquivo, as
+> apólices `Ativa` com término vencido há mais de 15 dias. Com 20 ou mais, o arquivo
+> aparece destacado e o cabeçalho ganha um ⚠️ ao lado de "N arquivos".
 
 Regras que sustentam isso:
 
